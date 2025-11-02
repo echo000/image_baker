@@ -32,7 +32,7 @@ impl About {
         let detail_mapper_feature = text("• Detail Baker: Blend detail maps with base color textures to add fine surface detail and variation.")
             .size(14);
 
-        let drag_drop_feature = text("• Drag & Drop: Supports filename-based automatic routing (_c for colour, _s for specular, _o for occlusion, _d for detail map).")
+        let drag_drop_feature = text("• Drag & Drop: Supports filename-based automatic routing (_c/_col/_color for colour, _s/_spec/_specular/_spc for specular, _o/_occ/_occlusion for occlusion, _d/_detail for detail map).")
             .size(14);
 
         let realtime_feature = text(

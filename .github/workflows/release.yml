@@ -1,0 +1,133 @@
+name: Build and Release
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    name: Build and Release Binaries
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            archive_name: ImageBaker-windows-x64.zip
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            archive_name: ImageBaker-macos-x64.zip
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            archive_name: ImageBaker-linux-x64.zip
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set Release Tag from Cargo.toml
+        id: prep
+        shell: bash
+        run: |
+          version=$(grep -m1 '^version\s*=' Cargo.toml | sed -E 's/version *= *"(.*)"/\1/')
+          echo "RELEASE_TAG=v$version" >> $GITHUB_ENV
+          echo "VERSION=$version" >> $GITHUB_ENV
+          echo "Detected version: $version"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.88.0
+          targets: ${{ matrix.target }}
+
+      - name: Install dependencies (Linux only)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev pkg-config
+
+      - name: Install dependencies (macOS only)
+        if: runner.os == 'macOS'
+        run: brew install pkg-config
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+      # Build the project
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      # Prepare binary and create zip archive
+      - name: Prepare binary and create archive (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          mkdir -p release_package
+          cp target/${{ matrix.target }}/release/image_baker.exe release_package/ImageBaker.exe
+          cd release_package
+          7z a ../ImageBaker-windows-x64.zip ImageBaker.exe
+          cd ..
+          echo "ASSET=ImageBaker-windows-x64.zip" >> $GITHUB_ENV
+
+      - name: Prepare binary and create archive (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          mkdir -p release_package
+          cp target/${{ matrix.target }}/release/image_baker release_package/ImageBaker
+          chmod +x release_package/ImageBaker
+          cd release_package
+          zip ../ImageBaker-macos-x64.zip ImageBaker
+          cd ..
+          echo "ASSET=ImageBaker-macos-x64.zip" >> $GITHUB_ENV
+
+      - name: Prepare binary and create archive (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          mkdir -p release_package
+          cp target/${{ matrix.target }}/release/image_baker release_package/ImageBaker
+          chmod +x release_package/ImageBaker
+          cd release_package
+          zip ../ImageBaker-linux-x64.zip ImageBaker
+          cd ..
+          echo "ASSET=ImageBaker-linux-x64.zip" >> $GITHUB_ENV
+
+      # Create release if triggered by workflow_dispatch
+      - name: Create Release
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: Release ${{ env.RELEASE_TAG }}
+          draft: false
+          prerelease: false
+          files: ${{ env.ASSET }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Upload to existing release if triggered by release event
+      - name: Upload to Existing Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ASSET }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

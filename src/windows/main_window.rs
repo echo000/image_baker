@@ -267,7 +267,7 @@ impl MainWindow {
             }
             BakingMode::DetailMapper => {
                 // Use filename suffix to determine image type (_c for base colour, _d for detail)
-                if let Some(img_type) = crate::core_logic::identify_detail_image_type(&path) {
+                if let Some(img_type) = crate::core_logic::identify_image_type(&path) {
                     self.detail_mapper.on_file_dropped(path, img_type)
                 } else {
                     self.detail_mapper.on_unknown_file_dropped(path)

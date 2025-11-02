@@ -257,6 +257,9 @@ impl Baker {
                     ImageType::Colour => self.colour_slot.load_image(img),
                     ImageType::Specular => self.specular_slot.load_image(img),
                     ImageType::Occlusion => self.occlusion_slot.load_image(img),
+                    ImageType::Detail => {
+                        // DetailMap is not used in baker, only in detail mapper
+                    }
                 }
                 Task::none()
             }

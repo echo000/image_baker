@@ -1,6 +1,6 @@
 # Image Baker
 
-A tool for merging texture maps (colour, specular, and occlusion) into a single baked output texture.
+A tool for merging texture maps (colour, specular, and occlusion) into a single baked output texture, and for baking detail maps into colour maps.
 
 Built with Rust and [Iced](https://github.com/iced-rs/iced)
 
@@ -16,9 +16,10 @@ Built with Rust and [Iced](https://github.com/iced-rs/iced)
 
 The application automatically detects texture types based on filename suffixes:
 
-- `*_c.*` - Colour/Diffuse map
-- `*_s.*` - Specular map
-- `*_o.*` - Occlusion/AO map
+- `*_c.*`, `*_col.*`, `*_color.*` - Colour/Diffuse map
+- `*_s.*`, `*_spec.*`, `*_specular.*`, `*_spc.*` - Specular map
+- `*_o.*`, `*_occ.*`, `*_occlusion.*` - Occlusion/AO map
+- `*_d.*`, `*_detail.*` - Detail map
 
 ## How to Use
 

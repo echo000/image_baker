@@ -1,7 +1,7 @@
 use crate::components::baker_layout::*;
 use crate::components::droppable_image_slot::DroppableImageSlot;
 use crate::components::image_operations;
-use crate::messages::Message;
+use crate::messages::{ImageType, Message};
 use crate::status::StatusMessage;
 use ::image::{DynamicImage, ImageBuffer, Rgba};
 use iced::widget::text;
@@ -30,17 +30,11 @@ pub enum DetailMapperMessage {
     IntensityChanged(f64),
     BrowseBaseColour,
     BrowseDetailMap,
-    FileSelected(DetailImageType, Option<PathBuf>),
-    ImageLoaded(DetailImageType, Result<DynamicImage, String>),
+    FileSelected(ImageType, Option<PathBuf>),
+    ImageLoaded(ImageType, Result<DynamicImage, String>),
     MergeCompleted(Result<ImageBuffer<Rgba<u8>, Vec<u8>>, String>),
     ImageSaved(Result<PathBuf, String>),
     Tick,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DetailImageType {
-    BaseColour,
-    DetailMap,
 }
 
 impl DetailMapper {
@@ -67,8 +61,8 @@ impl DetailMapper {
             ClearPressed => self.on_clear(),
             SavePressed => self.on_save(),
             IntensityChanged(val) => self.on_intensity_changed(val),
-            BrowseBaseColour => self.on_browse(DetailImageType::BaseColour),
-            BrowseDetailMap => self.on_browse(DetailImageType::DetailMap),
+            BrowseBaseColour => self.on_browse(ImageType::Colour),
+            BrowseDetailMap => self.on_browse(ImageType::Detail),
             FileSelected(img_type, path_opt) => self.on_file_selected(img_type, path_opt),
             ImageLoaded(img_type, result) => {
                 let task = self.on_image_loaded(img_type, result);
@@ -192,7 +186,7 @@ impl DetailMapper {
     }
 
     /// Handles browse button.
-    fn on_browse(&mut self, img_type: DetailImageType) -> Task<Message> {
+    fn on_browse(&mut self, img_type: ImageType) -> Task<Message> {
         Task::perform(
             image_operations::browse_for_image_async(img_type),
             |(img_type, path)| {
@@ -204,7 +198,7 @@ impl DetailMapper {
     /// Handles file selection.
     fn on_file_selected(
         &mut self,
-        img_type: DetailImageType,
+        img_type: ImageType,
         path_opt: Option<PathBuf>,
     ) -> Task<Message> {
         if let Some(path) = path_opt {
@@ -225,7 +219,7 @@ impl DetailMapper {
     /// Handles image loaded.
     fn on_image_loaded(
         &mut self,
-        img_type: DetailImageType,
+        img_type: ImageType,
         result: Result<DynamicImage, String>,
     ) -> Task<Message> {
         match result {
@@ -236,12 +230,13 @@ impl DetailMapper {
                 }
 
                 match img_type {
-                    DetailImageType::BaseColour => {
+                    ImageType::Colour => {
                         self.base_colour_slot.load_image(img);
                     }
-                    DetailImageType::DetailMap => {
+                    ImageType::Detail => {
                         self.detail_map_slot.load_image(img);
                     }
+                    _ => {}
                 }
                 self.status = image_operations::loaded_status_message(&img_type);
                 Task::none()
@@ -319,7 +314,7 @@ impl DetailMapper {
     }
 
     /// Helper to handle file drops.
-    pub fn on_file_dropped(&mut self, path: PathBuf, img_type: DetailImageType) -> Task<Message> {
+    pub fn on_file_dropped(&mut self, path: PathBuf, img_type: ImageType) -> Task<Message> {
         self.status = image_operations::loading_status_message(&img_type, &path);
         Task::perform(
             image_operations::load_image_async(path, img_type),

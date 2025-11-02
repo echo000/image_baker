@@ -1,5 +1,5 @@
 use crate::messages::ImageType;
-use image::{DynamicImage, GenericImageView, ImageBuffer, Pixel, Rgba, imageops::FilterType};
+use image::{DynamicImage, GenericImageView, ImageBuffer, Rgba, imageops::FilterType};
 use rayon::prelude::*;
 use std::path::Path;
 
@@ -99,7 +99,17 @@ pub fn apply_detail_map(
     base_intensity: f64,
 ) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
     let (width, height) = base_colour.dimensions();
-    let detail_dims = detail_map.dimensions();
+
+    // Resize detail map to match base dimensions if needed
+    let resized_detail = if detail_map.dimensions() == (width, height) {
+        detail_map.clone()
+    } else {
+        detail_map.resize(width, height, FilterType::CatmullRom)
+    };
+
+    // Convert to concrete buffer for thread-safe parallel access
+    let detail_buffer = resized_detail.to_rgba8();
+    let base_buffer = base_colour.to_rgba8();
 
     let mut output = ImageBuffer::new(width, height);
 
@@ -109,25 +119,18 @@ pub fn apply_detail_map(
     output
         .par_enumerate_pixels_mut()
         .for_each(|(x, y, output_pixel)| {
-            let base_pixel = base_colour.get_pixel(x, y).to_rgba();
+            let base_pixel = base_buffer.get_pixel(x, y);
 
             // Get the mask value from the base alpha channel
             let mask_value = base_pixel[3] as f64 / 255.0;
 
             // If the mask is 0, the blend does nothing.
             if mask_value == 0.0 {
-                *output_pixel = base_pixel;
+                *output_pixel = *base_pixel;
                 return;
             }
 
-            // Scale-to-fit mapping
-            let norm_x = x as f64 / (width - 1) as f64;
-            let norm_y = y as f64 / (height - 1) as f64;
-
-            let detail_x = (norm_x * (detail_dims.0 - 1) as f64).round() as u32;
-            let detail_y = (norm_y * (detail_dims.1 - 1) as f64).round() as u32;
-
-            let detail_pixel = detail_map.get_pixel(detail_x, detail_y).to_rgba();
+            let detail_pixel = detail_buffer.get_pixel(x, y);
 
             let mut result = [0u8; 4];
 
@@ -156,30 +159,25 @@ pub fn apply_detail_map(
     output
 }
 
-/// Identifies which slot the image belongs to based on filename.
+/// Identifies which slot the image belongs to based on filename suffix.
+/// Returns the appropriate ImageType for colour, specular, occlusion, or detail maps.
 pub fn identify_image_type(path: &Path) -> Option<ImageType> {
     let filename = path.file_name()?.to_str()?;
-    if filename.contains("_c.") {
+    if filename.contains("_c.") || filename.contains("_col.") || filename.contains("_color.") {
         Some(ImageType::Colour)
-    } else if filename.contains("_s.") {
+    } else if filename.contains("_s.")
+        || filename.contains("_spec.")
+        || filename.contains("_specular.")
+        || filename.contains("_spc.")
+    {
         Some(ImageType::Specular)
-    } else if filename.contains("_o.") {
+    } else if filename.contains("_o.")
+        || filename.contains("_occ.")
+        || filename.contains("_occlusion.")
+    {
         Some(ImageType::Occlusion)
-    } else {
-        None
-    }
-}
-
-/// Identifies detail mapper image type based on filename suffix.
-/// Returns BaseColor for _c, DetailMap for _d, or None if unrecognized.
-pub fn identify_detail_image_type(
-    path: &Path,
-) -> Option<crate::components::detail_mapper::DetailImageType> {
-    let filename = path.file_name()?.to_str()?;
-    if filename.contains("_c.") {
-        Some(crate::components::detail_mapper::DetailImageType::BaseColour)
-    } else if filename.contains("_d.") {
-        Some(crate::components::detail_mapper::DetailImageType::DetailMap)
+    } else if filename.contains("_d.") || filename.contains("_detail.") {
+        Some(ImageType::Detail)
     } else {
         None
     }

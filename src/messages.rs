@@ -24,6 +24,7 @@ pub enum ImageType {
     Colour,
     Specular,
     Occlusion,
+    Detail,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

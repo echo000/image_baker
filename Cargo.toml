@@ -1,6 +1,6 @@
 [package]
 name = "image_baker"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = ["echo000"]
 description = "A tool for merging texture maps into baked output textures"
