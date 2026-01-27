@@ -1,0 +1,26 @@
+[shader]
+name = "Pack NOG"
+description = "Combines Normal, Occlusion, and Gloss maps into a single packed NOG texture.\nDrag the normal texture on, expects textures with _o & _g at the end."
+author = "echo000"
+version = "1.0.0"
+
+[[inputs]]
+suffix = "_n"
+description = "Normal map"
+required = true
+
+[[inputs]]
+suffix = "_g"
+description = "Gloss map"
+required = true
+
+[[inputs]]
+suffix = "_o"
+description = "Occlusion Map"
+required = true
+
+[[outputs]]
+entry_point = "fs_nog"
+suffix = "_nog"
+description = "Combined NOG"
+format = "Rgba8Unorm"

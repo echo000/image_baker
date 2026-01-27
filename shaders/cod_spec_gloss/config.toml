@@ -1,0 +1,22 @@
+[shader]
+name = "CoD Spec/Gloss (RGB/A Split)"
+description = "Splits RGB specular and alpha gloss channels (Multiple CoD games)"
+author = "echo000, original script by Scobalula"
+version = "1.0.0"
+
+[[inputs]]
+suffix = "_input"
+description = "Input texture (required)"
+required = true
+
+[[outputs]]
+entry_point = "fs_rgb"
+suffix = "_s"
+description = "Specular map"
+format = "Rgba8Unorm"
+
+[[outputs]]
+entry_point = "fs_alpha"
+suffix = "_g"
+description = "Gloss map"
+format = "Rgba8Unorm"

@@ -9,7 +9,7 @@ pub enum Severity {
 }
 
 impl Severity {
-    /// Get the color for this severity level
+    /// Get the colour for this severity level
     pub fn colour(&self) -> Color {
         match self {
             Severity::Info => Color::from_rgb(0.7, 0.7, 0.7), // Light gray

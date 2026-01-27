@@ -1,0 +1,22 @@
+[shader]
+name = "CoD Fuse Albedo + Specular"
+description = "Combines separate albedo and specular maps into fused base colour with metalness (Black Ops 3/Cold War)"
+author = "echo000, original script by Astral"
+version = "1.0.0"
+
+[[inputs]]
+suffix = "_s"
+description = "Specular map"
+required = true
+
+[[outputs]]
+entry_point = "fs_base_colour"
+suffix = "_cs"
+description = "Colour with metalness in alpha"
+format = "Rgba8Unorm"
+
+[[outputs]]
+entry_point = "fs_gloss"
+suffix = "_g"
+description = "Gloss map"
+format = "Rgba8Unorm"

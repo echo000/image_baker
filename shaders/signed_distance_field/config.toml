@@ -1,0 +1,24 @@
+[shader]
+name = "Signed Distance Field (IW8+)"
+description = "Converts distance field to smooth alpha with anti-aliased edges"
+author = "echo000, original script by JerryMouse"
+version = "1.0.0"
+
+[[inputs]]
+suffix = "_df"
+description = "Distance Field texture (required)"
+required = true
+
+[[parameters]]
+name = "smoothing"
+type = "float"
+default = 0.015625
+min = 0.0
+max = 0.1
+description = "Edge smoothing amount"
+
+[[outputs]]
+entry_point = "fs_main"
+suffix = "_a"
+description = "Alpha"
+format = "Rgba8Unorm"

@@ -1,0 +1,16 @@
+[shader]
+name = "Invert RGB Values"
+description = "Inverts RGB colour values (1.0 - RGB) while preserving alpha"
+author = "echo000, original script by Astral"
+version = "1.0.0"
+
+[[inputs]]
+suffix = "_input"
+description = "Input texture (required)"
+required = true
+
+[[outputs]]
+entry_point = "fs_main"
+suffix = "_inverted"
+description = "Inverted"
+format = "Rgba8Unorm"

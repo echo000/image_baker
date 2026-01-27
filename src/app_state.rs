@@ -19,7 +19,7 @@ impl AppState {
     /// Constructs a new application state.
     pub fn new() -> Self {
         AppState {
-            name: "Image Baker",
+            name: "Texture Smith",
             version: env!("CARGO_PKG_VERSION"),
             controller: Controller::new(),
             settings: Settings::default(),

@@ -1,0 +1,22 @@
+[shader]
+name = "CoD Specular/Albedo (IW/MW)"
+description = "Separates fused diffuse/specular from CoD IW/MW (RGB=fused colour, A=metalness)"
+author = "echo000, original script by Scobalula"
+version = "1.0.0"
+
+[[inputs]]
+suffix = "_cs"
+description = "Fused colour/specular texture (required)"
+required = true
+
+[[outputs]]
+entry_point = "fs_albedo"
+suffix = "_c"
+description = "Diffuse/Albedo colour map"
+format = "Rgba8Unorm"
+
+[[outputs]]
+entry_point = "fs_specular"
+suffix = "_s"
+description = "Specular colour map"
+format = "Rgba8Unorm"

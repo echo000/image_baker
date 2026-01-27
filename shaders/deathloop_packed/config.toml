@@ -1,0 +1,28 @@
+[shader]
+name = "Deathloop Packed Texture (O/R/M)"
+description = "Splits packed texture (R=Ambient Occlusion, G=Roughness, B=Metallic)"
+author = "echo000"
+version = "1.0.0"
+
+[[inputs]]
+suffix = "_input"
+description = "Input texture (required)"
+required = true
+
+[[outputs]]
+entry_point = "fs_red"
+suffix = "_o"
+description = "AO map"
+format = "Rgba8Unorm"
+
+[[outputs]]
+entry_point = "fs_green"
+suffix = "_r"
+description = "Roughness map"
+format = "Rgba8Unorm"
+
+[[outputs]]
+entry_point = "fs_blue"
+suffix = "_m"
+description = "Metallic map"
+format = "Rgba8Unorm"

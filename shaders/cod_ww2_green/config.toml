@@ -1,0 +1,28 @@
+[shader]
+name = "CoD WW2 Green Image (S/O/G Split)"
+description = "Splits packed RGB channels into separate S/O/G maps (World War II)"
+author = "echo000, original script by Scobalula"
+version = "1.0.0"
+
+[[inputs]]
+suffix = "_input"
+description = "Input texture (required)"
+required = true
+
+[[outputs]]
+entry_point = "fs_red"
+suffix = "_s"
+description = "Specular map"
+format = "Rgba8Unorm"
+
+[[outputs]]
+entry_point = "fs_green"
+suffix = "_o"
+description = "Occlusion map"
+format = "Rgba8Unorm"
+
+[[outputs]]
+entry_point = "fs_blue"
+suffix = "_g"
+description = "Gloss map"
+format = "Rgba8Unorm"

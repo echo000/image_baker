@@ -1,0 +1,27 @@
+[shader]
+name = "CoD WW2 Split Colour/Specular"
+description = "Splits fused diffuse/specular using separate mask (World War II)\nExpects a texture with the same name as the input image with _s at the end."
+author = "echo000, original script by Scobalula"
+version = "1.0.0"
+
+[[inputs]]
+suffix = "_c"
+description = "Colour Texture"
+required = true
+
+[[inputs]]
+suffix = "_s"
+description = "Metalness mask texture"
+required = true
+
+[[outputs]]
+entry_point = "fs_albedo"
+suffix = "_c"
+description = "Colour map"
+format = "Rgba8Unorm"
+
+[[outputs]]
+entry_point = "fs_specular"
+suffix = "_s"
+description = "Specular map"
+format = "Rgba8Unorm"

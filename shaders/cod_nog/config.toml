@@ -1,0 +1,28 @@
+[shader]
+name = "CoD Normal/Gloss/Occlusion (IW/MW)"
+description = "Splits packed NOG texture (R=Gloss, G/A=Hemi-Oct Normal, B=Occlusion)"
+author = "echo000, original script by Scobalula"
+version = "1.0.0"
+
+[[inputs]]
+suffix = "_input"
+description = "Input texture (required)"
+required = true
+
+[[outputs]]
+entry_point = "fs_red"
+suffix = "_g"
+description = "Gloss map"
+format = "Rgba8Unorm"
+
+[[outputs]]
+entry_point = "fs_blue"
+suffix = "_o"
+description = "Occlusion map"
+format = "Rgba8Unorm"
+
+[[outputs]]
+entry_point = "fs_green_alpha"
+suffix = "_n"
+description = "Normal map"
+format = "Rgba8Unorm"

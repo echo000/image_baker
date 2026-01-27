@@ -14,34 +14,43 @@ impl About {
 
     /// Renders the About view
     pub fn view(&self, state: &AppState) -> Element<'_, Message> {
-        let title = text("Image Baker")
+        let title = text("Texture Smith")
             .size(32)
             .align_x(iced::alignment::Horizontal::Center);
 
-        let version = text(format!("Version {}", state.version))
+        let subtitle = text("GPU-Accelerated Texture Processing")
             .size(16)
+            .color(iced::Theme::default().extended_palette().primary.base.color)
+            .align_x(iced::alignment::Horizontal::Center);
+
+        let version = text(format!("Version {}", state.version))
+            .size(14)
             .align_x(iced::alignment::Horizontal::Center);
 
         let features_title = text("Features:")
-            .size(18)
+            .size(20)
             .align_x(iced::alignment::Horizontal::Left);
 
-        let spec_gloss_feature = text("• C/S/O Baker: Combine colour, specular, and occlusion maps into a single texture. Pack RGB albedo with specular in alpha, and optionally blend ambient occlusion.")
+        let shader_feature = text("• Custom Shader System: Process textures with WGSL shaders for unlimited creative possibilities")
             .size(14);
 
-        let detail_mapper_feature = text("• Detail Baker: Blend detail maps with base color textures to add fine surface detail and variation.")
+        let multi_output_feature =
+            text("• Multiple Outputs: Generate multiple texture maps from a single shader pass")
+                .size(14);
+
+        let realtime_feature = text("• Real-time Preview: Instant visual feedback with smooth, debounced parameter controls")
             .size(14);
 
-        let drag_drop_feature = text("• Drag & Drop: Supports filename-based automatic routing (_c/_col/_color for colour, _s/_spec/_specular/_spc for specular, _o/_occ/_occlusion for occlusion, _d/_detail for detail map).")
+        let drag_drop_feature = text("• Smart Loading: Drag & drop images or use file browser with automatic slot assignment")
             .size(14);
 
-        let realtime_feature = text(
-            "• Real-time Preview: See your results instantly with adjustable intensity controls.",
+        let format_feature = text(
+            "• Multi-Format Support: Save as PNG, TGA, TIFF, or DDS with one-click batch export",
         )
         .size(14);
 
         let author_title = text("Created By:")
-            .size(18)
+            .size(20)
             .align_x(iced::alignment::Horizontal::Left);
 
         let author = text("echo000")
@@ -49,30 +58,34 @@ impl About {
             .size(16)
             .align_x(iced::alignment::Horizontal::Left);
 
-        let github = text("Open source - Built with Rust and Iced")
+        let github = text("Open source - Built with Rust, Iced, and WGPU")
             .size(12)
             .color(iced::Theme::default().extended_palette().primary.base.color)
             .align_x(iced::alignment::Horizontal::Center);
 
         let content = column![
             title,
+            Space::with_height(5),
+            subtitle,
             Space::with_height(10),
             version,
-            Space::with_height(20),
+            Space::with_height(30),
             features_title,
             Space::with_height(10),
-            spec_gloss_feature,
-            Space::with_height(10),
-            detail_mapper_feature,
-            Space::with_height(10),
-            drag_drop_feature,
-            Space::with_height(10),
+            shader_feature,
+            Space::with_height(8),
+            multi_output_feature,
+            Space::with_height(8),
             realtime_feature,
-            Space::with_height(40),
+            Space::with_height(8),
+            drag_drop_feature,
+            Space::with_height(8),
+            format_feature,
+            Space::with_height(30),
             author_title,
             Space::with_height(10),
             author,
-            Space::with_height(40),
+            Space::with_height(30),
             github,
         ]
         .spacing(5)

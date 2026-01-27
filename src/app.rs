@@ -109,28 +109,7 @@ impl App {
             })
         });
 
-        // Add timer subscription for debouncing
-        let baker_timer = if self.main_window.baker.pending_merge {
-            iced::window::frames().map(|_| {
-                Message::Main(MainMessage::Baker(
-                    crate::components::baker::BakerMessage::Tick,
-                ))
-            })
-        } else {
-            Subscription::none()
-        };
-
-        let detail_mapper_timer = if self.main_window.detail_mapper.pending_merge {
-            iced::window::frames().map(|_| {
-                Message::Main(MainMessage::DetailMapper(
-                    crate::components::detail_mapper::DetailMapperMessage::Tick,
-                ))
-            })
-        } else {
-            Subscription::none()
-        };
-
-        Subscription::batch([events, controller, baker_timer, detail_mapper_timer])
+        Subscription::batch([events, controller])
     }
 
     /// Handles rendering a given window.

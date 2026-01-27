@@ -1,0 +1,54 @@
+[shader]
+name = "PBR to Colour/Spec/Gloss"
+description = "Converts Albedo/Metal/Roughness to Colour/Spec/Gloss"
+author = "echo000"
+version = "1.0.0"
+
+[[inputs]]
+suffix = "_a"
+description = "Albedo/BaseColour (required)"
+required = true
+
+[[inputs]]
+suffix = "_m"
+description = "Metallic (R) (required)"
+required = true
+
+[[inputs]]
+suffix = "_r"
+description = "Roughness (R) (required)"
+required = true
+
+[[parameters]]
+name = "colour_mask"
+type = "float"
+default = 1.0
+min = 0.0
+max = 1.0
+description = "Colour mask"
+
+[[parameters]]
+name = "spec_mask"
+type = "float"
+default = 1.0
+min = 0.0
+max = 1.0
+description = "Specular mask"
+
+[[outputs]]
+entry_point = "fs_colour"
+suffix = "_colour"
+description = "Colour/Diffuse map"
+format = "Rgba8Unorm"
+
+[[outputs]]
+entry_point = "fs_spec"
+suffix = "_spec"
+description = "Specular colour map"
+format = "Rgba8Unorm"
+
+[[outputs]]
+entry_point = "fs_gloss"
+suffix = "_gloss"
+description = "Gloss map"
+format = "Rgba8Unorm"

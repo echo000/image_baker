@@ -255,7 +255,7 @@ pub fn pick_list_style(theme: &Theme, _status: pick_list::Status) -> pick_list::
         border: Border {
             color: palette.background.strong.color,
             width: 1.0,
-            radius: 2.0.into(),
+            radius: 5.0.into(),
         },
     }
 }

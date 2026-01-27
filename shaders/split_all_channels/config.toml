@@ -1,0 +1,34 @@
+[shader]
+name = "Split All Channels (Global)"
+description = "Splits all RGBA channels into separate grayscale images (universal utility)"
+author = "echo000"
+version = "1.0.0"
+
+[[inputs]]
+suffix = "_input"
+description = "Input texture (required)"
+required = true
+
+[[outputs]]
+entry_point = "fs_red"
+suffix = "_r"
+description = "Red"
+format = "Rgba8Unorm"
+
+[[outputs]]
+entry_point = "fs_green"
+suffix = "_g"
+description = "Green"
+format = "Rgba8Unorm"
+
+[[outputs]]
+entry_point = "fs_blue"
+suffix = "_b"
+description = "Blue"
+format = "Rgba8Unorm"
+
+[[outputs]]
+entry_point = "fs_alpha"
+suffix = "_a"
+description = "Alpha"
+format = "Rgba8Unorm"

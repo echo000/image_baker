@@ -18,18 +18,3 @@ impl From<MainMessage> for Message {
         Message::Main(message)
     }
 }
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ImageType {
-    Colour,
-    Specular,
-    Occlusion,
-    Detail,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BakingMode {
-    SpecGlossPacker,
-    DetailMapper,
-    About,
-}

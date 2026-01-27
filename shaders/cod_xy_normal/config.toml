@@ -1,0 +1,16 @@
+[shader]
+name = "CoD Greyscale XY Normal (A/G)"
+description = "Reconstructs Z from DXT5 XY normal maps (Alpha=X, Green=Y) for older CoD games"
+author = "echo000, original script by Scobalula"
+version = "1.0.0"
+
+[[inputs]]
+suffix = "_n"
+description = "Normal map texture (required)"
+required = true
+
+[[outputs]]
+entry_point = "fs_main"
+suffix = "_normal"
+description = "Normal map"
+format = "Rgba8Unorm"

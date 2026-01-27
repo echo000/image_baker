@@ -1,0 +1,16 @@
+[shader]
+name = "Invert Green Channel"
+description = "Inverts green channel of a normal map"
+author = "echo000"
+version = "1.0.0"
+
+[[inputs]]
+suffix = "_c"
+description = "Colour texture"
+required = true
+
+[[outputs]]
+entry_point = "fs_main"
+suffix = "_inverted"
+description = "Inverted Green Channel"
+format = "Rgba8Unorm"

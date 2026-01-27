@@ -1,5 +1,17 @@
+//! Baker Layout Module
+//!
+//! Provides a standardized layout for texture processing UIs with:
+//! - Dynamic input slot arrangement
+//! - Output preview section
+//! - Parameter controls panel
+//! - Action buttons
+
 use iced::widget::{Column, Row, column, container, row, text};
 use iced::{Alignment, Element, Length};
+
+// Layout constants
+const SPACING: f32 = 15.0;
+const OUTPUT_SIZE: f32 = 280.0;
 
 /// Configuration for a baker layout
 pub struct BakerLayoutConfig<'a, Message: 'a> {
@@ -16,18 +28,25 @@ pub struct BakerLayoutConfig<'a, Message: 'a> {
 }
 
 /// Creates a baker layout with dynamic input scaling
+///
+/// # Layout Structure
+/// - Top: Input slot previews (horizontally distributed)
+/// - Bottom Left: Output preview
+/// - Bottom Right: Parameter controls and action buttons
 pub fn create_baker_layout<'a, Message: 'a + Clone>(
     config: BakerLayoutConfig<'a, Message>,
 ) -> Element<'a, Message> {
-    const SPACING: f32 = 15.0;
-    const OUTPUT_SIZE: f32 = 280.0;
-
     // Top row: Input previews (automatically distributed)
     let mut input_row = Row::new().spacing(SPACING).width(Length::Fill);
 
     for input_slot in config.input_slots {
         input_row = input_row.push(input_slot);
     }
+
+    // Wrap input row
+    let input_container = container(input_row)
+        .width(Length::Fill)
+        .center_x(Length::Fill);
 
     // Bottom left: Output preview
     use crate::widget_helpers::control;
@@ -78,7 +97,7 @@ pub fn create_baker_layout<'a, Message: 'a + Clone>(
         .height(Length::Fill);
 
     // Combine all sections vertically
-    let content = column![config.status_bar, input_row, bottom_row]
+    let content = column![config.status_bar, input_container, bottom_row]
         .spacing(8)
         .padding(20)
         .width(Length::Fill)
@@ -87,7 +106,9 @@ pub fn create_baker_layout<'a, Message: 'a + Clone>(
     content.into()
 }
 
-/// Helper to create an output preview widget from an optional handle
+/// Create an output preview widget from an optional handle
+///
+/// Shows either the provided image or a placeholder with text.
 pub fn create_output_preview<'a, Message: 'a>(
     output_handle: &'a Option<iced::widget::image::Handle>,
     placeholder_text: &'a str,
@@ -113,7 +134,7 @@ pub fn create_output_preview<'a, Message: 'a>(
     }
 }
 
-/// Helper to create a placeholder widget
+/// Create a placeholder widget with centered text
 pub fn create_placeholder<'a, Message: 'a>(msg: &'a str, size: f32) -> Element<'a, Message> {
     container(
         text(msg)
@@ -127,7 +148,13 @@ pub fn create_placeholder<'a, Message: 'a>(msg: &'a str, size: f32) -> Element<'
     .into()
 }
 
-/// Helper to create a slider control
+/// Create a slider control with label and value display
+///
+/// # Arguments
+/// * `label` - Text label for the slider
+/// * `value` - Current slider value
+/// * `range` - Min and max values for the slider
+/// * `on_change` - Callback when value changes
 pub fn create_slider_control<'a, Message: 'a + Clone>(
     label: &str,
     value: f64,
@@ -148,8 +175,10 @@ pub fn create_slider_control<'a, Message: 'a + Clone>(
     .into()
 }
 
-/// Helper to create a save button
-pub fn create_save_button<'a, Message: 'a + Clone>(
+/// Create a save all outputs button
+///
+/// Button is disabled when saving or no outputs are available.
+pub fn create_save_all_button<'a, Message: 'a + Clone>(
     is_saving: bool,
     has_output: bool,
     on_press: Message,
@@ -157,23 +186,23 @@ pub fn create_save_button<'a, Message: 'a + Clone>(
     use crate::widget_helpers::success_button_style;
     use iced::widget::button;
 
-    let save_button = button(text(if is_saving {
+    let save_all_button = button(text(if is_saving {
         "Saving..."
     } else {
-        "Save Output Image"
+        "Save Outputs"
     }))
     .padding(12)
     .width(Length::Fill)
     .style(success_button_style);
 
     if has_output && !is_saving {
-        save_button.on_press(on_press).into()
+        save_all_button.on_press(on_press).into()
     } else {
-        save_button.into()
+        save_all_button.into()
     }
 }
 
-/// Helper to create a clear button
+/// Create a clear button for resetting all inputs and outputs
 pub fn create_clear_button<'a, Message: 'a + Clone>(on_press: Message) -> Element<'a, Message> {
     use crate::widget_helpers::danger_button_style;
     use iced::widget::button;

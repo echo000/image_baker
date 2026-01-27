@@ -22,17 +22,14 @@ use iced::Task;
 use crate::AppState;
 use crate::Message;
 use crate::components::about::About;
-use crate::components::baker::{Baker, BakerMessage};
-use crate::components::detail_mapper::{DetailMapper, DetailMapperMessage};
-use crate::messages::BakingMode;
+use crate::components::texture_converter::{TextureSplitter, TextureSplitterMessage};
 
 /// Main window handler.
 pub struct MainWindow {
     pub id: window::Id,
-    pub baker: Baker,
-    pub detail_mapper: DetailMapper,
+    pub texture_splitter: TextureSplitter,
     pub about: About,
-    pub current_mode: BakingMode,
+    pub show_about: bool,
 }
 
 /// Messages produced by the main window.
@@ -40,9 +37,9 @@ pub struct MainWindow {
 pub enum MainMessage {
     UI(Event),
     Show,
-    Baker(BakerMessage),
-    DetailMapper(DetailMapperMessage),
-    ModeChanged(BakingMode),
+    TextureSplitter(TextureSplitterMessage),
+    ShowAbout,
+    HideAbout,
     FontLoaded(Result<(), iced::font::Error>),
 }
 
@@ -50,16 +47,6 @@ impl MainWindow {
     /// Creates a new main window.
     pub fn create() -> (Self, Task<window::Id>) {
         // Load window icon
-        let icon = {
-            let icon_bytes = include_bytes!("../../baker.ico");
-            image::load_from_memory_with_format(icon_bytes, image::ImageFormat::Ico)
-                .ok()
-                .and_then(|img| {
-                    let rgba = img.to_rgba8();
-                    let (width, height) = rgba.dimensions();
-                    window::icon::from_rgba(rgba.into_raw(), width, height).ok()
-                })
-        };
 
         let (id, task) = window::open(window::Settings {
             size: Size::new(780.0, 720.0),
@@ -67,17 +54,16 @@ impl MainWindow {
             min_size: Some(Size::new(780.0, 720.0)),
             visible: false,
             resizable: false,
-            icon,
+            //icon,
             ..Default::default()
         });
 
         (
             Self {
                 id,
-                baker: Baker::new(),
-                detail_mapper: DetailMapper::new(),
+                texture_splitter: TextureSplitter::new(),
                 about: About::new(),
-                current_mode: BakingMode::SpecGlossPacker,
+                show_about: false,
             },
             task,
         )
@@ -95,9 +81,15 @@ impl MainWindow {
         match message {
             UI(event) => self.on_ui(state, event),
             Show => self.on_show(),
-            Baker(message) => self.baker.update(message),
-            DetailMapper(message) => self.detail_mapper.update(message),
-            ModeChanged(mode) => self.on_mode_changed(mode),
+            TextureSplitter(message) => self.texture_splitter.update(message),
+            ShowAbout => {
+                self.show_about = true;
+                Task::none()
+            }
+            HideAbout => {
+                self.show_about = false;
+                Task::none()
+            }
             FontLoaded(result) => {
                 if let Err(e) = result {
                     tracing::error!("Failed to load font: {:#?}", e);
@@ -109,59 +101,25 @@ impl MainWindow {
 
     /// Handles rendering the main window.
     pub fn view<'a>(&'a self, state: &'a AppState) -> Element<'a, Message> {
-        // Tab buttons
-        let spec_gloss_tab = button(text("C/S/O Baker"))
-            .on_press(Message::Main(MainMessage::ModeChanged(
-                BakingMode::SpecGlossPacker,
-            )))
-            .style(if self.current_mode == BakingMode::SpecGlossPacker {
-                crate::widget_helpers::primary_button_style
-            } else {
-                crate::widget_helpers::secondary_button_style
-            })
-            .width(Length::Fill);
-
-        let detail_map_tab = button(text("Detail Baker"))
-            .on_press(Message::Main(MainMessage::ModeChanged(
-                BakingMode::DetailMapper,
-            )))
-            .style(if self.current_mode == BakingMode::DetailMapper {
-                crate::widget_helpers::primary_button_style
-            } else {
-                crate::widget_helpers::secondary_button_style
-            })
-            .width(Length::Fill);
-
-        let about_tab = button(text("About"))
-            .on_press(Message::Main(MainMessage::ModeChanged(BakingMode::About)))
-            .style(if self.current_mode == BakingMode::About {
-                crate::widget_helpers::primary_button_style
-            } else {
-                crate::widget_helpers::secondary_button_style
-            })
-            .width(Length::Fill);
-
-        let tab_row = row![spec_gloss_tab, detail_map_tab, about_tab]
-            .spacing(5)
-            .padding([10.0, 20.0]);
-
-        // Content based on current mode
-        let content_view = match self.current_mode {
-            BakingMode::SpecGlossPacker => self
-                .baker
+        // Content - show either texture converter or about page
+        let content_view = if self.show_about {
+            self.about.view(state)
+        } else {
+            self.texture_splitter
                 .view()
-                .map(|msg| Message::Main(MainMessage::Baker(msg))),
-            BakingMode::DetailMapper => self
-                .detail_mapper
-                .view()
-                .map(|msg| Message::Main(MainMessage::DetailMapper(msg))),
-            BakingMode::About => self.about.view(state),
+                .map(|msg| Message::Main(MainMessage::TextureSplitter(msg)))
         };
 
-        // Footer with version and theme picker
-        let theme = state.settings.theme.to_iced_theme();
-        let version = text(format!("Image Baker v{}.", state.version))
-            .color(theme.extended_palette().primary.base.color);
+        // Footer with about button and theme picker
+        let about_button = if self.show_about {
+            button(text("Back to Converter"))
+                .on_press(Message::Main(MainMessage::HideAbout))
+                .style(crate::widget_helpers::primary_button_style)
+        } else {
+            button(text("About"))
+                .on_press(Message::Main(MainMessage::ShowAbout))
+                .style(crate::widget_helpers::primary_button_style)
+        };
 
         let theme_picker = pick_list(
             crate::theme::AppTheme::ALL,
@@ -174,7 +132,7 @@ impl MainWindow {
         let footer = column![
             horizontal_rule(1),
             row![
-                column![version]
+                column![about_button]
                     .width(Length::Fill)
                     .align_x(Alignment::Start),
                 column![theme_picker]
@@ -187,7 +145,6 @@ impl MainWindow {
         .align_x(Alignment::Center);
 
         let content = column![
-            tab_row,
             container(content_view)
                 .width(Length::Fill)
                 .height(Length::Fill),
@@ -230,7 +187,10 @@ impl MainWindow {
 
     /// Occurs when the window has opened.
     fn on_opened(&mut self) -> Task<Message> {
-        Task::done(Message::WindowOpened(self.id))
+        Task::batch([
+            Task::done(Message::WindowOpened(self.id)),
+            TextureSplitter::initialize(),
+        ])
     }
 
     /// Occurs when the window is closed.
@@ -256,39 +216,18 @@ impl MainWindow {
             return Task::none();
         }
 
-        let result = match self.current_mode {
-            BakingMode::SpecGlossPacker => {
-                // Use filename suffix to determine image type
-                if let Some(img_type) = crate::core_logic::identify_image_type(&path) {
-                    self.baker.on_file_dropped(path, img_type)
-                } else {
-                    self.baker.on_unknown_file_dropped(path)
-                }
-            }
-            BakingMode::DetailMapper => {
-                // Use filename suffix to determine image type (_c for base colour, _d for detail)
-                if let Some(img_type) = crate::core_logic::identify_image_type(&path) {
-                    self.detail_mapper.on_file_dropped(path, img_type)
-                } else {
-                    self.detail_mapper.on_unknown_file_dropped(path)
-                }
-            }
-            BakingMode::About => {
-                // No file drops on About tab
-                Task::none()
-            }
+        // Only handle drops if not showing about page
+        let result = if self.show_about {
+            Task::none()
+        } else {
+            // Texture converter accepts any image file
+            self.texture_splitter.on_file_dropped(path)
         };
 
         // Clear file hovered state after processing drop
         state.file_hovered = false;
 
         result
-    }
-
-    /// Occurs when the mode is changed.
-    fn on_mode_changed(&mut self, mode: BakingMode) -> Task<Message> {
-        self.current_mode = mode;
-        Task::none()
     }
 
     /// Shows the main window.
@@ -307,14 +246,8 @@ fn main_background_style(theme: &Theme) -> container::Style {
     }
 }
 
-impl From<BakerMessage> for MainMessage {
-    fn from(message: BakerMessage) -> Self {
-        MainMessage::Baker(message)
-    }
-}
-
-impl From<DetailMapperMessage> for MainMessage {
-    fn from(message: DetailMapperMessage) -> Self {
-        MainMessage::DetailMapper(message)
+impl From<TextureSplitterMessage> for MainMessage {
+    fn from(message: TextureSplitterMessage) -> Self {
+        MainMessage::TextureSplitter(message)
     }
 }

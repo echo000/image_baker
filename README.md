@@ -16,7 +16,7 @@ Built with Rust and [Iced](https://github.com/iced-rs/iced)
 
 The application automatically detects texture types based on filename suffixes:
 
-- `*_c.*`, `*_col.*`, `*_color.*` - Colour/Diffuse map
+- `*_c.*`, `*_col.*`, `*_colour.*` - Colour/Diffuse map
 - `*_s.*`, `*_spec.*`, `*_specular.*`, `*_spc.*` - Specular map
 - `*_o.*`, `*_occ.*`, `*_occlusion.*` - Occlusion/AO map
 - `*_d.*`, `*_detail.*` - Detail map
@@ -34,6 +34,20 @@ The application automatically detects texture types based on filename suffixes:
    - Choose destination and save as PNG
 
 **Note**: The colour map is required to start merging. Specular and occlusion maps are optional - if not provided, the merge will use default values (white/no effect).
+
+## Texture Conversions
+
+The Texture Converter tab provides GPU-accelerated texture processing using custom shaders. It supports a wide range of operations including:
+
+- Channel splitting and extraction
+- Normal map reconstruction (BC5, DXT5, hemi-octahedron formats)
+- Fused texture separation (Call of Duty formats)
+- Format conversions and inversions
+- Multi-input texture merging
+
+### Creating Custom Converters
+
+Want to create your own texture processing shader? See the [Shader Guide](SHADER_GUIDE.md) for complete documentation on writing custom WGSL shaders.
 
 ## Building from Source
 
@@ -68,11 +82,6 @@ Settings are automatically saved to:
 
 ## Available Themes
 There are multiple themes to select from, each with a unique colour palette.
-
-## Credits
-
-- **GUI Framework**: [Iced](https://github.com/iced-rs/iced)
-- **File Dialogs**: [rfd](https://github.com/PolyMeilex/rfd)
 
 ## Contributing
 

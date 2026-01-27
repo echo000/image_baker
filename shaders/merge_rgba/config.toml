@@ -1,0 +1,21 @@
+[shader]
+name = "Merge RGB/Alpha (Global)"
+description = "Merges RGB colour and separate alpha textures into RGBA"
+author = "echo000"
+version = "1.0.0"
+
+[[inputs]]
+suffix = "_c"
+description = "Colour texture"
+required = true
+
+[[inputs]]
+suffix = "_a"
+description = "Alpha/mask texture"
+required = true
+
+[[outputs]]
+entry_point = "fs_main"
+suffix = "_merged"
+description = "Merged RGBA texture"
+format = "Rgba8Unorm"
