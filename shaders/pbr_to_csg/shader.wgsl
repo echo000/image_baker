@@ -61,8 +61,7 @@ fn fs_spec(input: VertexOutput) -> @location(0) vec4<f32> {
     let a = textureSample(albedo_texture, albedo_sampler, input.tex_coords);
     let m = saturate1(textureSample(metal_texture, metal_sampler, input.tex_coords).r);
 
-    // Use a fixed dielectric F0 since the other tool doesn't expose it
-    let f0 = vec3<f32>(0.04);
+    let f0 = vec3<f32>(0.15);
 
     // Full conversion spec:
     // metal=0 => 0.04

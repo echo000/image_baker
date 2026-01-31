@@ -708,13 +708,21 @@ impl TextureSplitter {
                         for (buffer, description) in outputs {
                             let filename = format!(
                                 "{}.{}",
-                                description.to_lowercase().replace(" ", "_"),
+                                description
+                                    .to_lowercase()
+                                    .replace(" ", "_")
+                                    .replace("/", "_")
+                                    .replace("\\", "_"),
                                 format.extension()
                             );
+
                             let file_path = folder_path.join(&filename);
 
+                            std::fs::create_dir_all(file_path.parent().unwrap_or(&file_path))
+                                .map_err(|e| format!("Failed to create directory: {e}"))?;
+
                             match buffer.into_porter_image() {
-                                Ok(img) => match img.save(&file_path) {
+                                Ok(mut img) => match img.save(&file_path) {
                                     Ok(_) => {
                                         saved_paths.push(file_path);
                                     }

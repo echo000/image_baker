@@ -119,9 +119,14 @@ impl PorterImage {
     }
 
     /// Save the image to a file
-    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<(), String> {
+    pub fn save<P: AsRef<Path>>(&mut self, path: P) -> Result<(), String> {
         let path = path.as_ref();
         let file_type = detect_file_type(path)?;
+
+        let best_format = self.inner.format_for_file_type(file_type);
+        self.inner
+            .convert(best_format, porter_texture::ImageConvertOptions::None)
+            .map_err(|e| format!("Failed to convert image: {e:?}"))?;
 
         self.inner
             .save(path, file_type)
