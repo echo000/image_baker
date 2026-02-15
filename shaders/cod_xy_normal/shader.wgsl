@@ -20,21 +20,31 @@ var input_sampler: sampler;
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     let pixel = textureSample(input_texture, input_sampler, input.tex_coords);
 
-    // Convert from [0,1] to [-1,1] range
-    // X is stored in alpha channel, Y is stored in green channel
-    let nX = pixel.a * 2.0 - 1.0;
-    let nY = pixel.g * 2.0 - 1.0;
+    // 1. Apply the specific CoD constants
+    // Note: pixel.a is pixel.W, pixel.g is pixel.Y
+    let nX = pixel.a * 4.08 - 2.08;
+    let nY = pixel.g * 4.064516 - 2.064516;
 
-    // Calculate Z component: Z = sqrt(1 - X² - Y²)
-    let nZ_squared = 1.0 - (nX * nX) - (nY * nY);
+    // 2. Set Z to 1.0
+    // Instead of calculating Z from X and Y, we assume a base height of 1.0
+    let nZ = 1.0;
 
-    // Only compute sqrt if the value is positive, otherwise clamp to 0
-    let nZ = select(0.0, sqrt(nZ_squared), nZ_squared > 0.0);
+    // 3. Normalize the vector
+    // This creates the final normal from the slope data
+    let dist = sqrt(nX * nX + nY * nY + nZ * nZ);
 
-    // Convert back to [0,1] range for output
-    let outputX = nX * 0.5 + 0.5;
-    let outputY = nY * 0.5 + 0.5;
-    let outputZ = nZ * 0.5 + 0.5;
+    // Avoid division by zero
+    let finalX = nX / dist;
+    let finalY = nY / dist;
+    let finalZ = nZ / dist;
 
-    return vec4<f32>(outputX, outputY, outputZ, 1.0);
+    // 4. Pack back to [0,1] range for output )
+    let finalZOutput = select(0.0, sqrt(finalZ) * 0.5 + 0.5, finalZ > 0.0);
+
+    return vec4<f32>(
+        finalX * 0.5 + 0.5,
+        finalY * 0.5 + 0.5,
+        finalZOutput,
+        1.0
+    );
 }

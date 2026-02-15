@@ -67,7 +67,7 @@ pub enum TextureSplitterMessage {
     DebouncedParameterProcess(u64), // Process parameters after debounce (generation)
     BrowseInput(usize),             // Browse for input slot at index
     InputFileSelected(usize, Option<PathBuf>), // Input slot index, path
-    InputImageLoaded(usize, Result<PorterImage, String>), // Input slot index, image
+    InputImageLoaded(usize, Result<PorterImage, String>, Option<PathBuf>), // Input slot index, image, source path
     MergeCompleted(Result<Vec<(ImageBuffer, String)>, String>, u64), // Result (outputs with descriptions), generation
     SaveAllPressed,
     FormatSelected(ImageFormat),
@@ -213,8 +213,8 @@ impl TextureSplitter {
             TextureSplitterMessage::InputFileSelected(slot_idx, path_opt) => {
                 self.on_input_file_selected(slot_idx, path_opt)
             }
-            TextureSplitterMessage::InputImageLoaded(slot_idx, result) => {
-                self.on_input_image_loaded(slot_idx, result)
+            TextureSplitterMessage::InputImageLoaded(slot_idx, result, path) => {
+                self.on_input_image_loaded(slot_idx, result, path)
             }
             TextureSplitterMessage::MergeCompleted(result, generation) => {
                 self.on_merge_completed(result, generation)
@@ -576,6 +576,7 @@ impl TextureSplitter {
             self.state.status =
                 StatusMessage::info(format!("Loading image for slot {slot_idx}..."));
 
+            let path_clone = path.clone();
             Task::perform(
                 async move {
                     match PorterImage::open(&path) {
@@ -585,7 +586,11 @@ impl TextureSplitter {
                 },
                 move |result| {
                     Message::Main(crate::windows::MainMessage::TextureSplitter(
-                        TextureSplitterMessage::InputImageLoaded(slot_idx, result),
+                        TextureSplitterMessage::InputImageLoaded(
+                            slot_idx,
+                            result,
+                            Some(path_clone),
+                        ),
                     ))
                 },
             )
@@ -602,11 +607,12 @@ impl TextureSplitter {
         &mut self,
         slot_idx: usize,
         result: Result<PorterImage, String>,
+        path: Option<PathBuf>,
     ) -> Task<Message> {
         match result {
             Ok(img) => {
                 if slot_idx < self.state.input_slots.len() {
-                    self.state.input_slots[slot_idx].load_image(img);
+                    self.state.input_slots[slot_idx].load_image(img, path);
                     // Update cached handle for this slot
                     self.state.update_input_slot_handle(slot_idx);
                     self.state.status =
@@ -674,14 +680,32 @@ impl TextureSplitter {
         }
     }
 
-    /// Save all output images to a selected folder
+    /// Save all output images to the first input slot's directory
     ///
-    /// Opens folder picker and saves all outputs with auto-generated filenames
-    /// using the currently selected image format.
+    /// Saves all outputs with auto-generated filenames to the same directory
+    /// as the first input image, using the currently selected image format.
     fn on_save_all(&mut self) -> Task<Message> {
         if !self.state.is_saving && !self.state.output_buffers.is_empty() {
+            // Get the directory from the first input slot
+            let folder_path = match self
+                .state
+                .input_slots
+                .first()
+                .and_then(|slot| slot.get_directory())
+            {
+                Some(dir) => dir,
+                None => {
+                    self.state.status =
+                        StatusMessage::error("No input image path available. Load an image first.");
+                    return Task::none();
+                }
+            };
+
             self.state.is_saving = true;
-            self.state.status = StatusMessage::info("Saving all outputs...");
+            self.state.status = StatusMessage::info(format!(
+                "Saving all outputs to {}...",
+                folder_path.display()
+            ));
 
             // Clone all output buffers and descriptions
             let outputs: Vec<(ImageBuffer, String)> = self
@@ -696,52 +720,42 @@ impl TextureSplitter {
 
             Task::perform(
                 async move {
-                    let folder = rfd::AsyncFileDialog::new()
-                        .set_title("Select folder to save all outputs")
-                        .pick_folder()
-                        .await;
+                    let mut saved_paths = Vec::new();
 
-                    if let Some(folder_handle) = folder {
-                        let folder_path = folder_handle.path().to_path_buf();
-                        let mut saved_paths = Vec::new();
+                    for (buffer, description) in outputs {
+                        let filename = format!(
+                            "{}.{}",
+                            description
+                                .to_lowercase()
+                                .replace(" ", "_")
+                                .replace("/", "_")
+                                .replace("\\", "_"),
+                            format.extension()
+                        );
 
-                        for (buffer, description) in outputs {
-                            let filename = format!(
-                                "{}.{}",
-                                description
-                                    .to_lowercase()
-                                    .replace(" ", "_")
-                                    .replace("/", "_")
-                                    .replace("\\", "_"),
-                                format.extension()
-                            );
+                        let file_path = folder_path.join(&filename);
 
-                            let file_path = folder_path.join(&filename);
+                        std::fs::create_dir_all(file_path.parent().unwrap_or(&file_path))
+                            .map_err(|e| format!("Failed to create directory: {e}"))?;
 
-                            std::fs::create_dir_all(file_path.parent().unwrap_or(&file_path))
-                                .map_err(|e| format!("Failed to create directory: {e}"))?;
-
-                            match buffer.into_porter_image() {
-                                Ok(mut img) => match img.save(&file_path) {
-                                    Ok(_) => {
-                                        saved_paths.push(file_path);
-                                    }
-                                    Err(e) => {
-                                        return Err(format!("Failed to save {filename}: {e}"));
-                                    }
-                                },
-                                Err(e) => {
-                                    return Err(format!(
-                                        "Failed to convert buffer for {filename}: {e}"
-                                    ));
+                        match buffer.into_porter_image() {
+                            Ok(mut img) => match img.save(&file_path) {
+                                Ok(_) => {
+                                    saved_paths.push(file_path);
                                 }
+                                Err(e) => {
+                                    return Err(format!("Failed to save {filename}: {e}"));
+                                }
+                            },
+                            Err(e) => {
+                                return Err(format!(
+                                    "Failed to convert buffer for {filename}: {e}"
+                                ));
                             }
                         }
-
-                        Ok(saved_paths)
-                    } else {
-                        Err("Save cancelled".to_string())
                     }
+
+                    Ok(saved_paths)
                 },
                 |result| {
                     Message::Main(crate::windows::MainMessage::TextureSplitter(
