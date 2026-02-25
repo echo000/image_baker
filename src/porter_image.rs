@@ -77,16 +77,6 @@ impl PorterImage {
         );
 
         if is_grayscale_alpha || is_grayscale_only {
-            if is_grayscale_only {
-                tracing::info!(
-                    "Detected single-channel grayscale format (BC4), manually converting to RGBA8"
-                );
-            } else {
-                tracing::info!(
-                    "Detected GrayscaleAlpha format (RG/BC5), manually converting to RGBA8"
-                );
-            }
-
             // First convert to RGBA8 (this will incorrectly put data in RG channels)
             let target_format = if current_format.is_srgb() {
                 ImageFormat::R8G8B8A8UnormSrgb
@@ -123,7 +113,6 @@ impl PorterImage {
                     buffer[offset + 2] = gray; // B = gray
                     buffer[offset + 3] = 255; // A = opaque
                 }
-                tracing::info!("Fixed single-channel grayscale to proper RGBA8");
             } else {
                 // GrayscaleAlpha/BC5: R=gray, G=alpha
                 for i in 0..pixel_count {
@@ -136,7 +125,6 @@ impl PorterImage {
                     buffer[offset + 2] = gray; // B = gray
                     buffer[offset + 3] = alpha; // A = alpha
                 }
-                tracing::info!("Fixed GrayscaleAlpha channels to proper RGBA8");
             }
         } else {
             // Normal conversion for other formats
@@ -150,8 +138,6 @@ impl PorterImage {
                 .convert(target_format, Default::default())
                 .map_err(|e| format!("Failed to convert to RGBA8: {e:?}"))?;
         }
-
-        tracing::info!("Final format: {:?}", self.inner.format());
 
         Ok(())
     }

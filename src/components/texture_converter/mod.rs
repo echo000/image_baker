@@ -879,7 +879,32 @@ impl TextureSplitter {
 
         match result {
             Ok(outputs) => {
-                self.state.set_outputs(outputs);
+                // Generate proper output descriptions using input filename with suffix
+                let corrected_outputs = if let Some(shader) = self.state.get_selected_shader() {
+                    // Get base filename from first input slot
+                    let base_filename = self
+                        .state
+                        .input_slots
+                        .first()
+                        .and_then(|slot| slot.path.as_ref())
+                        .and_then(|path| path.file_stem())
+                        .map(|stem| stem.to_string_lossy().to_string())
+                        .unwrap_or_else(|| "output".to_string());
+
+                    // Create new outputs with proper descriptions
+                    outputs
+                        .into_iter()
+                        .zip(shader.outputs.iter())
+                        .map(|((buffer, _desc), output_config)| {
+                            let description = format!("{}{}", base_filename, output_config.suffix);
+                            (buffer, description)
+                        })
+                        .collect()
+                } else {
+                    outputs
+                };
+
+                self.state.set_outputs(corrected_outputs);
 
                 if self.state.outputs.len() > 1 {
                     self.state.status = StatusMessage::success(format!(
