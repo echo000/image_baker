@@ -56,17 +56,103 @@ impl PorterImage {
     pub fn convert_to_rgba8(&mut self) -> Result<(), String> {
         let current_format = self.inner.format();
 
-        // Convert to RGB/sRGB as needed
-        let target_format = if current_format.is_srgb() {
-            ImageFormat::R8G8B8A8UnormSrgb
-        } else {
-            ImageFormat::R8G8B8A8Unorm
-        };
+        // Handle GrayscaleAlpha (R8G8) where R=gray, G=alpha
+        // Also handle BC4 (single channel) and BC5 (two channel) compressed formats
+        let is_grayscale_alpha = matches!(
+            current_format,
+            ImageFormat::R8G8Unorm
+                | ImageFormat::R8G8Typeless
+                | ImageFormat::R16G16Unorm
+                | ImageFormat::R16G16Float
+                | ImageFormat::R32G32Float
+                | ImageFormat::Bc5Unorm
+                | ImageFormat::Bc5Snorm
+                | ImageFormat::Bc5Typeless
+        );
 
-        // If already in target format, no its a noop
-        self.inner
-            .convert(target_format, Default::default())
-            .map_err(|e| format!("Failed to convert to RGBA8: {e:?}"))?;
+        // BC4 is single-channel (grayscale only, no alpha)
+        let is_grayscale_only = matches!(
+            current_format,
+            ImageFormat::Bc4Unorm | ImageFormat::Bc4Snorm | ImageFormat::Bc4Typeless
+        );
+
+        if is_grayscale_alpha || is_grayscale_only {
+            if is_grayscale_only {
+                tracing::info!(
+                    "Detected single-channel grayscale format (BC4), manually converting to RGBA8"
+                );
+            } else {
+                tracing::info!(
+                    "Detected GrayscaleAlpha format (RG/BC5), manually converting to RGBA8"
+                );
+            }
+
+            // First convert to RGBA8 (this will incorrectly put data in RG channels)
+            let target_format = if current_format.is_srgb() {
+                ImageFormat::R8G8B8A8UnormSrgb
+            } else {
+                ImageFormat::R8G8B8A8Unorm
+            };
+
+            self.inner
+                .convert(target_format, Default::default())
+                .map_err(|e| format!("Failed to convert to RGBA8: {e:?}"))?;
+
+            // Now fix the channels: R,G,B should all be the grayscale value (was in R)
+            // A should be the alpha value (was in G)
+            let width = self.width();
+            let height = self.height();
+            let pixel_count = (width * height) as usize;
+
+            let frame = self
+                .inner
+                .frames_mut()
+                .first_mut()
+                .ok_or_else(|| "Image has no frames".to_string())?;
+
+            let buffer = frame.buffer_mut();
+
+            if is_grayscale_only {
+                // BC4: R channel has grayscale, replicate to G and B, set A to 255
+                for i in 0..pixel_count {
+                    let offset = i * 4;
+                    let gray = buffer[offset]; // Grayscale value in R
+
+                    // R already has gray, just replicate to G and B
+                    buffer[offset + 1] = gray; // G = gray
+                    buffer[offset + 2] = gray; // B = gray
+                    buffer[offset + 3] = 255; // A = opaque
+                }
+                tracing::info!("Fixed single-channel grayscale to proper RGBA8");
+            } else {
+                // GrayscaleAlpha/BC5: R=gray, G=alpha
+                for i in 0..pixel_count {
+                    let offset = i * 4;
+                    let gray = buffer[offset]; // Grayscale value
+                    let alpha = buffer[offset + 1]; // Alpha value
+
+                    // R already has gray, replicate to G and B, move alpha to A
+                    buffer[offset + 1] = gray; // G = gray
+                    buffer[offset + 2] = gray; // B = gray
+                    buffer[offset + 3] = alpha; // A = alpha
+                }
+                tracing::info!("Fixed GrayscaleAlpha channels to proper RGBA8");
+            }
+        } else {
+            // Normal conversion for other formats
+            let target_format = if current_format.is_srgb() {
+                ImageFormat::R8G8B8A8UnormSrgb
+            } else {
+                ImageFormat::R8G8B8A8Unorm
+            };
+
+            self.inner
+                .convert(target_format, Default::default())
+                .map_err(|e| format!("Failed to convert to RGBA8: {e:?}"))?;
+        }
+
+        tracing::info!("Final format: {:?}", self.inner.format());
+
         Ok(())
     }
 

@@ -1,0 +1,16 @@
+[shader]
+name = "Convert Format"
+description = "Passthrough shader for converting image formats (e.g., PNG to TGA)"
+author = "echo000"
+version = "1.0.0"
+
+[[inputs]]
+suffix = "_input"
+description = "Input texture (required)"
+required = true
+
+[[outputs]]
+entry_point = "fs_main"
+suffix = "_converted"
+description = "Converted output"
+format = "Rgba8Unorm"
