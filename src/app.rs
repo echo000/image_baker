@@ -173,7 +173,7 @@ impl App {
 
     /// Launches the application.
     pub fn launch() -> iced::Result {
-        crate::panic_hook::install("image_baker", env!("CARGO_PKG_VERSION"));
+        crate::panic_hook::install("texture_smith", env!("CARGO_PKG_VERSION"));
         crate::logger::init_logging();
 
         // Initialize global rayon thread pool.

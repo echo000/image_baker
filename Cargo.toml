@@ -1,11 +1,11 @@
 [package]
-name = "image_baker"
+name = "texture_smith"
 version = "0.1.1"
 edition = "2024"
 authors = ["echo000"]
 description = "A tool for merging texture maps into baked output textures"
 license = "GPL-3.0"
-repository = "https://github.com/echo000/image_baker"
+repository = "https://github.com/echo000/texture_smith"
 keywords = ["texture", "image", "graphics", "baking"]
 categories = ["graphics", "multimedia::images"]
 

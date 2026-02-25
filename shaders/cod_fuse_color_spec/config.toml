@@ -5,6 +5,11 @@ author = "echo000, original script by Astral"
 version = "1.0.0"
 
 [[inputs]]
+suffix = "_c"
+description = "Colour map"
+required = true
+
+[[inputs]]
 suffix = "_s"
 description = "Specular map"
 required = true

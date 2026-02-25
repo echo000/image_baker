@@ -57,6 +57,6 @@ impl StatusMessage {
 
 impl Default for StatusMessage {
     fn default() -> Self {
-        Self::info("Image Baker Initialized.")
+        Self::info("Texture Smith Initialized.")
     }
 }

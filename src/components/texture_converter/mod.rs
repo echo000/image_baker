@@ -501,7 +501,7 @@ impl TextureSplitter {
 
                     if failed_count > 0 {
                         self.state.status = StatusMessage::warning(format!(
-                            "{} shader{} loaded, {} failed. Check image_baker.log for details.",
+                            "{} shader{} loaded, {} failed. Check texture_smith.log for details.",
                             shaders.len(),
                             if shaders.len() == 1 { "" } else { "s" },
                             failed_count

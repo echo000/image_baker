@@ -1,4 +1,4 @@
-# Image Baker
+# Texture Smith
 
 A tool for merging texture maps (colour, specular, and occlusion) into a single baked output texture, and for baking detail maps into colour maps.
 
@@ -60,7 +60,7 @@ Want to create your own texture processing shader? See the [Shader Guide](SHADER
 
 ```bash
 # Clone the repository
-git clone https://github.com/echo000/image_baker
+git clone https://github.com/echo000/texture_smith
 cd image_merge
 
 # Build in release mode
@@ -70,7 +70,7 @@ cargo build --release
 cargo run --release
 ```
 
-The compiled binary will be in `target/release/image_baker.exe` (Windows)
+The compiled binary will be in `target/release/texture_smith.exe` (Windows)
 
 ## Configuration
 
