@@ -636,7 +636,20 @@ impl TextureSplitter {
     /// Collects images from all slots and processes them using the selected shader
     /// with current parameter values. Uses generation counter to handle concurrent requests.
     fn trigger_merge_from_slots(&mut self) -> Task<Message> {
-        if !self.state.all_required_slots_filled() {
+        // Check if we can process based on shader requirements
+        let can_process = if let Some(shader) = self.state.get_selected_shader() {
+            // For shaders with no inputs, we can always process
+            if shader.inputs.is_empty() {
+                true
+            } else {
+                // For shaders with inputs, check if required slots are filled
+                self.state.all_required_slots_filled()
+            }
+        } else {
+            false
+        };
+
+        if !can_process {
             return Task::none();
         }
 
@@ -649,9 +662,6 @@ impl TextureSplitter {
                 }
             }
 
-            if images.is_empty() {
-                return Task::none();
-            }
 
             // Get parameters
             let shader_name = shader.shader.name.clone();

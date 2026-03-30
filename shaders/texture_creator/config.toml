@@ -1,0 +1,59 @@
+[shader]
+name = "Texture Creator"
+description = "Creates a texture from RGBA values"
+author = "echo000"
+version = "1.0.0"
+
+[[parameters]]
+name = "Width"
+type = "int"
+default = 512.0
+min = 1.0
+max = 8192.0
+description = "Output texture width"
+
+[[parameters]]
+name = "Height"
+type = "int"
+default = 512.0
+min = 1.0
+max = 8192.0
+description = "Output texture height"
+
+[[parameters]]
+name = "Red"
+type = "float"
+default = 255.0
+min = 0.0
+max = 255.0
+description = "Red Channel Value"
+
+[[parameters]]
+name = "Green"
+type = "float"
+default = 255.0
+min = 0.0
+max = 255.0
+description = "Green Channel Value"
+
+[[parameters]]
+name = "Blue"
+type = "float"
+default = 255.0
+min = 0.0
+max = 255.0
+description = "Blue Channel Value"
+
+[[parameters]]
+name = "Alpha"
+type = "float"
+default = 255.0
+min = 0.0
+max = 255.0
+description = "Alpha Channel Value"
+
+[[outputs]]
+entry_point = "fs_main"
+suffix = "generated"
+description = "Generated"
+format = "Rgba8Unorm"
