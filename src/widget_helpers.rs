@@ -1,5 +1,5 @@
-use iced::widget::{Column, Container, Row, button, column, container, pick_list, slider, text};
-use iced::{Alignment, Border, Color, Element, Length, Theme, alignment};
+use iced::widget::{Column, Container, Row, button, column, container, pick_list, scrollable, slider, text};
+use iced::{Alignment, Background, Border, Color, Element, Length, Theme, alignment};
 
 /// Creates a centered text widget
 pub fn centered_text(input: impl Into<String>) -> iced::widget::Text<'static> {
@@ -84,7 +84,7 @@ pub fn frame_style(theme: &Theme) -> container::Style {
     container::Style::default().border(Border {
         color: palette.background.strong.color,
         width: 1.0,
-        radius: 5.0.into(),
+        radius: 6.0.into(),
     })
 }
 
@@ -94,9 +94,9 @@ pub fn dark_style(theme: &Theme) -> container::Style {
     container::Style::default()
         .background(palette.background.base.color)
         .border(Border {
-            color: palette.background.weak.color,
-            width: 1.5,
-            radius: 5.0.into(),
+            color: palette.background.strong.color,
+            width: 1.0,
+            radius: 6.0.into(),
         })
 }
 
@@ -110,7 +110,40 @@ pub fn hovered_style(theme: &Theme) -> container::Style {
         .border(Border {
             color: Color { a: 0.8, ..accent },
             width: 2.0,
-            radius: 5.0.into(),
+            radius: 6.0.into(),
+        })
+}
+
+/// Drop zone style for empty input slots — subtle inset with a dimmer border
+pub fn drop_zone_style(theme: &Theme) -> container::Style {
+    let palette = theme.extended_palette();
+    container::Style::default()
+        .background(Color {
+            a: 0.25,
+            ..palette.background.strong.color
+        })
+        .border(Border {
+            color: Color {
+                a: 0.45,
+                ..palette.background.strong.color
+            },
+            width: 1.5,
+            radius: 6.0.into(),
+        })
+}
+
+/// Header style — slightly elevated surface for section headers
+pub fn header_style(theme: &Theme) -> container::Style {
+    let palette = theme.extended_palette();
+    container::Style::default()
+        .background(Color {
+            a: 0.4,
+            ..palette.background.strong.color
+        })
+        .border(Border {
+            color: palette.background.strong.color,
+            width: 1.0,
+            radius: Border::default().radius,
         })
 }
 
@@ -126,11 +159,11 @@ pub fn primary_button_style(theme: &Theme, status: button::Status) -> button::St
                 text_color: palette.primary.base.color,
                 border: Border {
                     color: Color {
-                        a: 0.5,
+                        a: 0.55,
                         ..palette.primary.base.color
                     },
                     width: 1.5,
-                    radius: 5.0.into(),
+                    radius: 6.0.into(),
                 },
                 ..base
             }
@@ -138,19 +171,19 @@ pub fn primary_button_style(theme: &Theme, status: button::Status) -> button::St
         button::Status::Hovered => button::Style {
             background: Some(
                 Color {
-                    a: 0.4,
+                    a: 0.18,
                     ..palette.primary.base.color
                 }
                 .into(),
             ),
-            text_color: palette.background.base.text,
+            text_color: palette.primary.base.color,
             border: Border {
                 color: Color {
-                    a: 0.5,
+                    a: 0.8,
                     ..palette.primary.base.color
                 },
                 width: 1.5,
-                radius: 5.0.into(),
+                radius: 6.0.into(),
             },
             ..base
         },
@@ -163,37 +196,57 @@ pub fn success_button_style(theme: &Theme, status: button::Status) -> button::St
     let base = button::Style::default();
 
     match status {
-        button::Status::Active | button::Status::Pressed | button::Status::Disabled => {
-            button::Style {
-                background: None,
-                text_color: palette.success.base.color,
-                border: Border {
-                    color: Color {
-                        a: 0.5,
-                        ..palette.success.base.color
-                    },
-                    width: 1.5,
-                    radius: 5.0.into(),
-                },
-                ..base
-            }
-        }
-        button::Status::Hovered => button::Style {
+        button::Status::Active | button::Status::Pressed => button::Style {
             background: Some(
                 Color {
-                    a: 0.4,
+                    a: 0.12,
                     ..palette.success.base.color
                 }
                 .into(),
             ),
-            text_color: palette.background.base.text,
+            text_color: palette.success.base.color,
             border: Border {
                 color: Color {
-                    a: 0.5,
+                    a: 0.55,
                     ..palette.success.base.color
                 },
                 width: 1.5,
-                radius: 5.0.into(),
+                radius: 6.0.into(),
+            },
+            ..base
+        },
+        button::Status::Disabled => button::Style {
+            background: None,
+            text_color: Color {
+                a: 0.3,
+                ..palette.success.base.color
+            },
+            border: Border {
+                color: Color {
+                    a: 0.2,
+                    ..palette.success.base.color
+                },
+                width: 1.5,
+                radius: 6.0.into(),
+            },
+            ..base
+        },
+        button::Status::Hovered => button::Style {
+            background: Some(
+                Color {
+                    a: 0.25,
+                    ..palette.success.base.color
+                }
+                .into(),
+            ),
+            text_color: palette.success.base.color,
+            border: Border {
+                color: Color {
+                    a: 0.85,
+                    ..palette.success.base.color
+                },
+                width: 1.5,
+                radius: 6.0.into(),
             },
             ..base
         },
@@ -209,14 +262,17 @@ pub fn danger_button_style(theme: &Theme, status: button::Status) -> button::Sty
         button::Status::Active | button::Status::Pressed | button::Status::Disabled => {
             button::Style {
                 background: None,
-                text_color: palette.danger.base.color,
+                text_color: Color {
+                    a: 0.7,
+                    ..palette.danger.base.color
+                },
                 border: Border {
                     color: Color {
-                        a: 0.5,
+                        a: 0.35,
                         ..palette.danger.base.color
                     },
                     width: 1.5,
-                    radius: 5.0.into(),
+                    radius: 6.0.into(),
                 },
                 ..base
             }
@@ -224,19 +280,19 @@ pub fn danger_button_style(theme: &Theme, status: button::Status) -> button::Sty
         button::Status::Hovered => button::Style {
             background: Some(
                 Color {
-                    a: 0.4,
+                    a: 0.15,
                     ..palette.danger.base.color
                 }
                 .into(),
             ),
-            text_color: palette.background.base.text,
+            text_color: palette.danger.base.color,
             border: Border {
                 color: Color {
-                    a: 0.5,
+                    a: 0.7,
                     ..palette.danger.base.color
                 },
                 width: 1.5,
-                radius: 5.0.into(),
+                radius: 6.0.into(),
             },
             ..base
         },
@@ -244,18 +300,33 @@ pub fn danger_button_style(theme: &Theme, status: button::Status) -> button::Sty
 }
 
 /// Pick list style
-pub fn pick_list_style(theme: &Theme, _status: pick_list::Status) -> pick_list::Style {
+pub fn pick_list_style(theme: &Theme, status: pick_list::Status) -> pick_list::Style {
     let palette = theme.extended_palette();
+
+    let border_color = match status {
+        pick_list::Status::Opened { .. } => palette.primary.base.color,
+        _ => palette.background.strong.color,
+    };
 
     pick_list::Style {
         text_color: palette.background.base.text,
-        placeholder_color: palette.background.weak.text,
-        handle_color: palette.background.base.text,
-        background: palette.background.base.color.into(),
+        placeholder_color: Color {
+            a: 0.5,
+            ..palette.background.base.text
+        },
+        handle_color: Color {
+            a: 0.7,
+            ..palette.background.base.text
+        },
+        background: Color {
+            a: 0.6,
+            ..palette.background.strong.color
+        }
+        .into(),
         border: Border {
-            color: palette.background.strong.color,
+            color: border_color,
             width: 1.0,
-            radius: 5.0.into(),
+            radius: 6.0.into(),
         },
     }
 }
@@ -276,7 +347,7 @@ pub fn secondary_button_style(theme: &Theme, status: button::Status) -> button::
                         ..palette.background.strong.color
                     },
                     width: 1.0,
-                    radius: 5.0.into(),
+                    radius: 6.0.into(),
                 },
                 ..base
             }
@@ -296,10 +367,82 @@ pub fn secondary_button_style(theme: &Theme, status: button::Status) -> button::
                     ..palette.background.strong.color
                 },
                 width: 1.0,
-                radius: 5.0.into(),
+                radius: 6.0.into(),
             },
             ..base
         },
+    }
+}
+
+/// Bottom bar for slot cards — slightly elevated tint, no explicit border needed
+/// (the outer frame_style container provides the card border)
+pub fn slot_bar_style(theme: &Theme) -> container::Style {
+    let palette = theme.extended_palette();
+    container::Style {
+        background: Some(Background::Color(Color {
+            a: 0.55,
+            ..palette.background.strong.color
+        })),
+        border: Border {
+            color: Color {
+                a: 0.4,
+                ..palette.background.strong.color
+            },
+            width: 1.0,
+            radius: iced::border::Radius {
+                top_left: 0.0,
+                top_right: 0.0,
+                bottom_right: 6.0,
+                bottom_left: 6.0,
+            },
+        },
+        ..Default::default()
+    }
+}
+
+/// Thin bar at the bottom of the output panel (filename / nav) — same tint as slot bar
+pub fn panel_bar_style(theme: &Theme) -> container::Style {
+    slot_bar_style(theme)
+}
+
+/// Scrollable style — thin, subtle rail that matches the theme
+pub fn scrollable_style(
+    theme: &Theme,
+    _status: scrollable::Status,
+) -> scrollable::Style {
+    let palette = theme.extended_palette();
+
+    scrollable::Style {
+        container: container::Style::default(),
+        vertical_rail: scrollable::Rail {
+            background: Some(Background::Color(Color {
+                a: 0.08,
+                ..palette.background.strong.color
+            })),
+            border: Border {
+                radius: 3.0.into(),
+                ..Border::default()
+            },
+            scroller: scrollable::Scroller {
+                color: Color {
+                    a: 0.35,
+                    ..palette.primary.base.color
+                },
+                border: Border {
+                    radius: 3.0.into(),
+                    ..Border::default()
+                },
+            },
+        },
+        horizontal_rail: scrollable::Rail {
+            background: None,
+            border: Border::default(),
+            scroller: scrollable::Scroller {
+                color: Color::TRANSPARENT,
+                border: Border::default(),
+            },
+        },
+        gap: None,
     }
 }
 

@@ -1,6 +1,6 @@
 # Texture Smith
 
-A tool for merging texture maps (colour, specular, and occlusion) into a single baked output texture, and for baking detail maps into colour maps.
+A tool for performing image operations on various packed/compressed textures!
 
 Built with Rust and [Iced](https://github.com/iced-rs/iced)
 
@@ -10,34 +10,19 @@ Built with Rust and [Iced](https://github.com/iced-rs/iced)
 
 - **Browse Button Interface**: Click Browse buttons to select texture maps for each slot
 - **Real-time Preview**: See input textures and merged output in real-time
-- **Customizable Settings**: Adjust AO contrast and specular intensity with sliders
-
-## Supported Texture Maps
-
-The application automatically detects texture types based on filename suffixes:
-
-- `*_c.*`, `*_col.*`, `*_colour.*` - Colour/Diffuse map
-- `*_s.*`, `*_spec.*`, `*_specular.*`, `*_spc.*` - Specular map
-- `*_o.*`, `*_occ.*`, `*_occlusion.*` - Occlusion/AO map
-- `*_d.*`, `*_detail.*` - Detail map
+- **Customizable Settings**
 
 ## How to Use
 
 1. **Launch the application**
+2. **Select a shader from the dropdown**
 2. **Load your texture files** using the Browse buttons:
-   - Click "Browse..." under Colour Map or drag and drop a file to load your colour/diffuse texture (required)
-   - Click "Browse..." under Specular Map or drag and drop a file to load your specular texture (optional)
-   - Click "Browse..." under Occlusion Map or drag and drop a file to load your AO texture (optional)
-3. **Watch the merged output** appear automatically after loading the colour map
+3. **Watch the merged output**
 4. **Save the merged output**:
-   - Click "Save Merged Image" button
-   - Choose destination and save as PNG
-
-**Note**: The colour map is required to start merging. Specular and occlusion maps are optional - if not provided, the merge will use default values (white/no effect).
 
 ## Texture Conversions
 
-The Texture Converter tab provides GPU-accelerated texture processing using custom shaders. It supports a wide range of operations including:
+This provides GPU-accelerated texture processing using custom shaders. It supports a wide range of operations including:
 
 - Channel splitting and extraction
 - Normal map reconstruction (BC5, DXT5, hemi-octahedron formats)

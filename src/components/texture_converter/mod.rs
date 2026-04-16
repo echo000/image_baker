@@ -16,6 +16,7 @@ mod types;
 pub use gpu_processor::process_images;
 pub use shader_manager::load_shaders;
 pub use state::TextureConverterState;
+pub use types::DdsSaveFormat;
 pub use types::ImageFormat;
 
 // Keep original types here for compatibility
@@ -37,16 +38,6 @@ const PARAMETER_DEBOUNCE_MS: u64 = 150;
 #[allow(dead_code)]
 const MAX_IMAGE_DIMENSION: u32 = 8192;
 
-/// Size for single input slot preview
-const SLOT_SIZE_SINGLE: f32 = 280.0;
-/// Size for two input slots preview
-const SLOT_SIZE_TWO: f32 = 240.0;
-/// Size for three input slots preview
-const SLOT_SIZE_THREE: f32 = 220.0;
-/// Size for four input slots preview
-const SLOT_SIZE_FOUR: f32 = 200.0;
-/// Size for five or more input slots preview
-const SLOT_SIZE_MANY: f32 = 180.0;
 
 // Shared vertex shader for all texture processing operations
 pub const FULLSCREEN_QUAD_VERTEX_SHADER: &[u8] =
@@ -56,6 +47,7 @@ pub const FULLSCREEN_QUAD_VERTEX_SHADER: &[u8] =
 pub struct TextureSplitter {
     state: TextureConverterState,
     selected_format: ImageFormat,
+    selected_dds_format: DdsSaveFormat,
 }
 
 /// Messages produced by the texture splitter component
@@ -71,6 +63,7 @@ pub enum TextureSplitterMessage {
     MergeCompleted(Result<Vec<(ImageBuffer, String)>, String>, u64), // Result (outputs with descriptions), generation
     SaveAllPressed,
     FormatSelected(ImageFormat),
+    DdsFormatSelected(DdsSaveFormat),
     ClearPressed,
     AllImagesSaved(Result<Vec<PathBuf>, String>),
     NextOutput,
@@ -156,6 +149,7 @@ impl TextureSplitter {
         Self {
             state: TextureConverterState::new(),
             selected_format: ImageFormat::default(),
+            selected_dds_format: DdsSaveFormat::default(),
         }
     }
 
@@ -224,6 +218,10 @@ impl TextureSplitter {
                 self.selected_format = format;
                 Task::none()
             }
+            TextureSplitterMessage::DdsFormatSelected(dds_format) => {
+                self.selected_dds_format = dds_format;
+                Task::none()
+            }
             TextureSplitterMessage::ClearPressed => self.on_clear(),
             TextureSplitterMessage::AllImagesSaved(result) => self.on_all_images_saved(result),
             TextureSplitterMessage::NextOutput => {
@@ -251,12 +249,15 @@ impl TextureSplitter {
         use crate::components::baker_layout::*;
         use crate::widget_helpers::pick_list_style;
 
-        let status_bar = text(&self.state.status.message)
-            .size(12)
-            .color(self.state.status.colour());
+        // ── Status bar ────────────────────────────────────────────────────────
+        let status_bar = row![
+            text(&self.state.status.message)
+                .size(13)
+                .color(self.state.status.colour())
+        ]
+        .padding([2, 4]);
 
-        // Shader picker
-        let shader_label = text("Select Shader:").size(16);
+        // ── Top bar: shader picker + description + reload ──────────────────────
         let shader_picker = if !self.state.shaders.is_empty() {
             pick_list(
                 self.state.shaders.as_slice(),
@@ -269,6 +270,7 @@ impl TextureSplitter {
                 },
             )
             .placeholder("Select a shader...")
+            .width(Length::Fill)
             .style(pick_list_style)
         } else {
             pick_list(
@@ -277,112 +279,132 @@ impl TextureSplitter {
                 |_: ShaderConfig| TextureSplitterMessage::ShaderSelected(String::new()),
             )
             .placeholder("No shaders available")
+            .width(Length::Fill)
             .style(pick_list_style)
         };
 
-        let reload_button = button("Reload Shaders")
+        let shader_description: String = self
+            .state
+            .get_selected_shader()
+            .map(|s| s.shader.description.clone())
+            .unwrap_or_default();
+
+        let reload_button = button("Reload")
             .on_press(TextureSplitterMessage::ReloadShaders)
-            .padding(8)
-            .style(crate::widget_helpers::primary_button_style);
+            .padding([6, 12])
+            .style(crate::widget_helpers::secondary_button_style);
 
-        let shader_picker_section = row![
-            column![shader_label, shader_picker]
-                .spacing(8)
-                .align_x(iced::Alignment::Start),
-            container(reload_button)
-                .width(Length::Fill)
-                .align_x(iced::alignment::Horizontal::Right)
-        ]
-        .spacing(20)
-        .padding(20)
+        let top_bar = container(
+            row![
+                column![
+                    shader_picker,
+                    text(shader_description)
+                        .size(11)
+                        .style(|theme: &iced::Theme| iced::widget::text::Style {
+                            color: Some(iced::Color {
+                                a: 0.55,
+                                ..theme.extended_palette().background.base.text
+                            }),
+                        }),
+                ]
+                .spacing(4)
+                .width(Length::Fill),
+                container(reload_button).align_x(iced::alignment::Horizontal::Right),
+            ]
+            .spacing(10)
+            .align_y(iced::Alignment::Center),
+        )
+        .padding([8, 12])
         .width(Length::Fill)
-        .align_y(iced::Alignment::Center);
+        .style(crate::widget_helpers::dark_style);
 
-        // Render input slots using cached handles
-        let mut input_slot_views = Vec::new();
+        // ── Input slot views ──────────────────────────────────────────────────
+        let input_slot_views: Vec<_> = self
+            .state
+            .input_slots
+            .iter()
+            .enumerate()
+            .map(|(idx, slot)| self.view_compact_slot(idx, slot))
+            .collect();
 
-        for (idx, slot) in self.state.input_slots.iter().enumerate() {
-            let slot_view = self.view_cached_slot(idx, slot);
-            input_slot_views.push(slot_view);
-        }
-
-        // Output preview with navigation
+        // ── Output preview with navigation ────────────────────────────────────
         let output_widget = if !self.state.outputs.is_empty() {
             let current_handle = &self.state.outputs[self.state.current_output_index];
             let current_desc = &self.state.output_descriptions[self.state.current_output_index];
 
-            // Create navigation info text
-            let nav_text = if self.state.outputs.len() > 1 {
-                text(format!(
-                    "{} ({}/{})",
-                    current_desc,
-                    self.state.current_output_index + 1,
-                    self.state.outputs.len()
-                ))
-                .size(14)
-            } else {
-                text(current_desc.clone()).size(14)
-            };
-
-            // Create navigation buttons
-            let prev_button = button("<")
-                .on_press_maybe(if self.state.current_output_index > 0 {
-                    Some(TextureSplitterMessage::PreviousOutput)
-                } else {
-                    None
-                })
-                .padding(8)
-                .style(crate::widget_helpers::primary_button_style);
-
-            let next_button = button(">")
-                .on_press_maybe(
-                    if self.state.current_output_index < self.state.outputs.len() - 1 {
-                        Some(TextureSplitterMessage::NextOutput)
-                    } else {
-                        None
-                    },
-                )
-                .padding(8)
-                .style(crate::widget_helpers::primary_button_style);
-
-            // Build preview with navigation
             let preview = container(
                 iced::widget::image(current_handle.clone())
                     .content_fit(iced::ContentFit::Contain)
-                    .width(400)
-                    .height(400),
+                    .width(Length::Fill)
+                    .height(Length::Fill),
             )
-            .width(400)
-            .height(400)
-            .center_x(Length::Fill);
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .style(crate::widget_helpers::dark_style);
 
             if self.state.outputs.len() > 1 {
-                column![
-                    nav_text,
-                    row![
-                        prev_button,
-                        container(preview)
-                            .width(Length::Fill)
-                            .center_x(Length::Fill),
-                        next_button
-                    ]
-                    .spacing(10)
-                    .align_y(iced::Alignment::Center)
+                let prev_button = button("‹")
+                    .on_press_maybe(if self.state.current_output_index > 0 {
+                        Some(TextureSplitterMessage::PreviousOutput)
+                    } else {
+                        None
+                    })
+                    .padding([4, 10])
+                    .style(crate::widget_helpers::primary_button_style);
+
+                let next_button = button("›")
+                    .on_press_maybe(
+                        if self.state.current_output_index < self.state.outputs.len() - 1 {
+                            Some(TextureSplitterMessage::NextOutput)
+                        } else {
+                            None
+                        },
+                    )
+                    .padding([4, 10])
+                    .style(crate::widget_helpers::primary_button_style);
+
+                let nav_row = row![
+                    prev_button,
+                    text(format!(
+                        "{} ({}/{})",
+                        current_desc,
+                        self.state.current_output_index + 1,
+                        self.state.outputs.len()
+                    ))
+                    .size(12)
+                    .width(Length::Fill)
+                    .align_x(iced::alignment::Horizontal::Center),
+                    next_button,
                 ]
-                .spacing(8)
-                .align_x(iced::Alignment::Center)
-                .into()
-            } else {
-                column![nav_text, preview]
-                    .spacing(8)
+                .spacing(6)
+                .align_y(iced::Alignment::Center)
+                .width(Length::Fill);
+
+                column![preview, nav_row]
+                    .spacing(6)
                     .align_x(iced::Alignment::Center)
+                    .width(Length::Fill)
+                    .height(Length::Fill)
                     .into()
+            } else {
+                column![
+                    preview,
+                    text(current_desc.clone())
+                        .size(12)
+                        .align_x(iced::alignment::Horizontal::Center)
+                        .width(Length::Fill),
+                ]
+                .spacing(6)
+                .align_x(iced::Alignment::Center)
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .into()
             }
         } else {
             create_output_preview(&None, "Output will appear here")
         };
 
-        // Create parameter sliders
+        // ── Parameter sliders ─────────────────────────────────────────────────
         let mut controls = Vec::new();
         if let Some(shader) = self.state.get_selected_shader() {
             let shader_name = shader.shader.name.clone();
@@ -395,78 +417,105 @@ impl TextureSplitter {
                     .unwrap_or(param.default);
 
                 let param_name = param.name.clone();
-                let param_slider = create_slider_control(
-                    &param.description,
+                controls.push(create_slider_control(
+                    param.description.clone(),
                     current_value as f64,
                     param.min as f64..=param.max as f64,
                     move |val| {
                         TextureSplitterMessage::ParameterChanged(param_name.clone(), val as f32)
                     },
-                );
-                controls.push(param_slider);
+                ));
             }
         }
 
-        // Create action buttons with format selector (always visible)
-        let mut buttons = Vec::new();
-
-        // Format selector and save button (always visible)
+        // Output format picker
         let format_selector = pick_list(
             &ImageFormat::ALL[..],
             Some(self.selected_format),
             TextureSplitterMessage::FormatSelected,
         )
-        .padding(12)
+        .padding([6, 10])
+        .width(Length::Fill)
         .placeholder("Format")
         .style(pick_list_style);
 
-        let save_all_button = create_save_all_button(
-            self.state.is_saving,
-            !self.state.output_buffers.is_empty(),
-            TextureSplitterMessage::SaveAllPressed,
+        controls.push(
+            column![
+                text("Output Format")
+                    .size(12)
+                    .style(|theme: &iced::Theme| iced::widget::text::Style {
+                        color: Some(iced::Color {
+                            a: 0.6,
+                            ..theme.extended_palette().background.base.text
+                        }),
+                    }),
+                format_selector,
+            ]
+            .spacing(4)
+            .into(),
         );
 
-        let save_row = row![
-            container(format_selector).width(Length::FillPortion(1)),
-            container(save_all_button).width(Length::FillPortion(2)),
-        ]
-        .spacing(10)
-        .width(Length::Fill);
+        // DDS sub-format — only visible when DDS is selected
+        if self.selected_format == ImageFormat::Dds {
+            let dds_format_selector = pick_list(
+                &DdsSaveFormat::ALL[..],
+                Some(self.selected_dds_format),
+                TextureSplitterMessage::DdsFormatSelected,
+            )
+            .padding([6, 10])
+            .width(Length::Fill)
+            .placeholder("DDS Format")
+            .style(pick_list_style);
 
-        buttons.push(save_row.into());
+            controls.push(
+                column![
+                    text("DDS Pixel Format")
+                        .size(12)
+                        .style(|theme: &iced::Theme| iced::widget::text::Style {
+                            color: Some(iced::Color {
+                                a: 0.6,
+                                ..theme.extended_palette().background.base.text
+                            }),
+                        }),
+                    dds_format_selector,
+                ]
+                .spacing(4)
+                .into(),
+            );
+        }
 
-        let clear_button = create_clear_button(TextureSplitterMessage::ClearPressed);
-        buttons.push(clear_button);
+        // ── Buttons ───────────────────────────────────────────────────────────
+        let buttons = vec![
+            create_save_all_button(
+                self.state.is_saving,
+                !self.state.output_buffers.is_empty(),
+                TextureSplitterMessage::SaveAllPressed,
+            ),
+            create_clear_button(TextureSplitterMessage::ClearPressed),
+        ];
 
-        // Build main layout using baker_layout
-        let baker_content = create_baker_layout(BakerLayoutConfig {
+        // ── Assemble ──────────────────────────────────────────────────────────
+        create_baker_layout(BakerLayoutConfig {
+            top_bar: top_bar.into(),
             input_slots: input_slot_views,
             output_widget,
             controls,
             buttons,
             status_bar: status_bar.into(),
-        });
-
-        // Combine shader picker at top with baker layout below
-        column![shader_picker_section, baker_content]
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .into()
+        })
     }
 
-    /// Handle file dropped onto the window
+    /// Handle file dropped onto the window.
     ///
     /// Loads the dropped file into the first available empty slot.
     /// If all slots are filled, displays a warning message.
     pub fn on_file_dropped(&mut self, path: PathBuf) -> Task<Message> {
-        // Load into the first empty slot
         for (idx, slot) in self.state.input_slots.iter().enumerate() {
             if slot.image.is_none() {
                 return self.on_input_file_selected(idx, Some(path));
             }
         }
 
-        // If all slots are filled, show a message
         self.state.status =
             StatusMessage::warning("All input slots are filled. Clear to load new images.");
         Task::none()
@@ -727,6 +776,7 @@ impl TextureSplitter {
                 .collect();
 
             let format = self.selected_format;
+            let dds_format = self.selected_dds_format;
 
             Task::perform(
                 async move {
@@ -748,19 +798,104 @@ impl TextureSplitter {
                         std::fs::create_dir_all(file_path.parent().unwrap_or(&file_path))
                             .map_err(|e| format!("Failed to create directory: {e}"))?;
 
-                        match buffer.into_porter_image() {
-                            Ok(mut img) => match img.save(&file_path) {
-                                Ok(_) => {
-                                    saved_paths.push(file_path);
+                        if format == ImageFormat::Dds && dds_format.is_bc_compressed() {
+                            // ── BC compression via intel_tex_2 ──────────────
+                            let (width, height) = buffer.dimensions();
+                            let rgba_data = buffer.into_raw();
+
+                            let surface = intel_tex_2::RgbaSurface {
+                                width,
+                                height,
+                                stride: width * 4,
+                                data: &rgba_data,
+                            };
+
+                            let compressed = match dds_format {
+                                DdsSaveFormat::Bc1Unorm | DdsSaveFormat::Bc1UnormSrgb => {
+                                    intel_tex_2::bc1::compress_blocks(&surface)
                                 }
+                                DdsSaveFormat::Bc3Unorm | DdsSaveFormat::Bc3UnormSrgb => {
+                                    intel_tex_2::bc3::compress_blocks(&surface)
+                                }
+                                DdsSaveFormat::Bc4Unorm => {
+                                    intel_tex_2::bc4::compress_blocks(&surface)
+                                }
+                                DdsSaveFormat::Bc5Unorm => {
+                                    intel_tex_2::bc5::compress_blocks(&surface)
+                                }
+                                DdsSaveFormat::Bc7Unorm | DdsSaveFormat::Bc7UnormSrgb => {
+                                    let settings =
+                                        intel_tex_2::bc7::alpha_ultra_fast_settings();
+                                    intel_tex_2::bc7::compress_blocks(&settings, &surface)
+                                }
+                                _ => unreachable!(),
+                            };
+
+                            let porter_fmt = dds_format.bc_porter_format().unwrap();
+
+                            let mut img =
+                                porter_texture::Image::new(width, height, porter_fmt)
+                                    .map_err(|e| format!("Failed to create image: {e:?}"))?;
+
+                            let frame = img.create_frame().map_err(|e| {
+                                format!("Failed to create frame: {e:?}")
+                            })?;
+
+                            frame.buffer_mut().copy_from_slice(&compressed);
+
+                            img.save(&file_path, porter_texture::ImageFileType::Dds)
+                                .map_err(|e| format!("Failed to save {filename}: {e:?}"))?;
+
+                            saved_paths.push(file_path);
+                        } else if format == ImageFormat::Dds {
+                            // ── Uncompressed DDS via porter-texture ─────────
+                            let (width, height) = buffer.dimensions();
+                            let rgba_data = buffer.into_raw();
+
+                            let source_fmt = dds_format.source_porter_format();
+                            let target_fmt =
+                                dds_format.uncompressed_porter_format().unwrap();
+
+                            let mut img =
+                                porter_texture::Image::new(width, height, source_fmt)
+                                    .map_err(|e| format!("Failed to create image: {e:?}"))?;
+
+                            let frame = img.create_frame().map_err(|e| {
+                                format!("Failed to create frame: {e:?}")
+                            })?;
+
+                            frame.buffer_mut().copy_from_slice(&rgba_data);
+
+                            if target_fmt != source_fmt {
+                                img.convert(
+                                    target_fmt,
+                                    porter_texture::ImageConvertOptions::None,
+                                )
+                                .map_err(|e| {
+                                    format!("Failed to convert to {target_fmt:?}: {e:?}")
+                                })?;
+                            }
+
+                            img.save(&file_path, porter_texture::ImageFileType::Dds)
+                                .map_err(|e| format!("Failed to save {filename}: {e:?}"))?;
+
+                            saved_paths.push(file_path);
+                        } else {
+                            // ── PNG / TGA / TIFF — existing path ────────────
+                            match buffer.into_porter_image() {
+                                Ok(mut img) => match img.save(&file_path) {
+                                    Ok(_) => {
+                                        saved_paths.push(file_path);
+                                    }
+                                    Err(e) => {
+                                        return Err(format!("Failed to save {filename}: {e}"));
+                                    }
+                                },
                                 Err(e) => {
-                                    return Err(format!("Failed to save {filename}: {e}"));
+                                    return Err(format!(
+                                        "Failed to convert buffer for {filename}: {e}"
+                                    ));
                                 }
-                            },
-                            Err(e) => {
-                                return Err(format!(
-                                    "Failed to convert buffer for {filename}: {e}"
-                                ));
                             }
                         }
                     }
@@ -811,65 +946,70 @@ impl TextureSplitter {
         Task::none()
     }
 
-    /// Render an input slot using cached image handle
-    ///
-    /// Uses cached image handles to avoid regenerating them every frame.
-    /// Slot size is responsive based on the total number of input slots.
-    fn view_cached_slot<'a>(
+    /// Compact horizontal slot row: [thumbnail] label [Browse]
+    fn view_compact_slot<'a>(
         &'a self,
         idx: usize,
         slot: &'a DroppableImageSlot,
     ) -> Element<'a, TextureSplitterMessage> {
-        use crate::widget_helpers::{control, primary_button_style};
-        use iced::widget::{button, column, container};
+        use crate::widget_helpers::{dark_style, drop_zone_style, primary_button_style};
+        use iced::widget::{button, container, row, text};
 
-        // Make slot size responsive based on number of inputs
-        let preview_size = match self.state.input_slots.len() {
-            1 => SLOT_SIZE_SINGLE,
-            2 => SLOT_SIZE_TWO,
-            3 => SLOT_SIZE_THREE,
-            4 => SLOT_SIZE_FOUR,
-            _ => SLOT_SIZE_MANY,
-        };
+        const THUMB: f32 = 44.0;
 
-        // Create the image preview using cached handle or placeholder
-        let image_widget = if let Some(cached_handle) = self.state.get_input_slot_handle(idx) {
-            // Use cached handle - no conversion needed!
+        let thumbnail: Element<_> = if let Some(handle) = self.state.get_input_slot_handle(idx) {
             container(
-                iced::widget::image(cached_handle.clone())
+                iced::widget::image(handle.clone())
                     .content_fit(iced::ContentFit::Cover)
-                    .width(preview_size)
-                    .height(preview_size),
+                    .width(THUMB)
+                    .height(THUMB),
             )
-            .width(preview_size)
-            .height(preview_size)
-            .center_x(Length::Fill)
-            .center_y(Length::Fill)
+            .width(THUMB)
+            .height(THUMB)
+            .style(dark_style)
+            .into()
         } else {
-            // Show placeholder
             container(
-                text("Drop file or Browse")
-                    .size(14)
-                    .align_x(iced::alignment::Horizontal::Center),
+                text("·")
+                    .size(20)
+                    .style(|theme: &iced::Theme| iced::widget::text::Style {
+                        color: Some(iced::Color {
+                            a: 0.2,
+                            ..theme.extended_palette().background.base.text
+                        }),
+                    }),
             )
-            .width(preview_size)
-            .height(preview_size)
-            .center_x(Length::Fill)
-            .center_y(Length::Fill)
+            .width(THUMB)
+            .height(THUMB)
+            .style(drop_zone_style)
+            .center_x(THUMB)
+            .center_y(THUMB)
+            .into()
         };
 
-        // Build the complete slot with label and browse button
-        let browse_button = button("Browse...")
+        let browse_btn = button(text("Browse").size(11))
             .on_press(TextureSplitterMessage::BrowseInput(idx))
-            .padding(8)
-            .width(preview_size)
+            .padding([5, 10])
             .style(primary_button_style);
 
-        let col = column![image_widget, browse_button]
-            .spacing(8)
-            .align_x(iced::Alignment::Center);
-
-        control(text(&slot.label).size(13).into(), col.into()).into()
+        container(
+            row![
+                thumbnail,
+                text(&slot.label)
+                    .size(12)
+                    .width(Length::Fill)
+                    .style(|theme: &iced::Theme| iced::widget::text::Style {
+                        color: Some(theme.extended_palette().background.base.text),
+                    }),
+                browse_btn,
+            ]
+            .spacing(10)
+            .align_y(iced::Alignment::Center),
+        )
+        .padding([6, 8])
+        .width(Length::Fill)
+        .style(crate::widget_helpers::frame_style)
+        .into()
     }
 
     /// Handle GPU processing completion

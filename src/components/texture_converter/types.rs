@@ -64,6 +64,162 @@ impl std::fmt::Display for ImageFormat {
     }
 }
 
+/// DDS pixel format sub-selection (shown when DDS is the export format).
+///
+/// BC formats are encoded with intel_tex_2.
+/// Uncompressed formats are converted via porter-texture's GPU converter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DdsSaveFormat {
+    // ── BC compressed ──────────────────────────────────────────────────────
+    /// BC1 / DXT1, linear, 4 bpp (RGB, 1-bit alpha)
+    Bc1Unorm,
+    /// BC1 / DXT1, sRGB, 4 bpp
+    Bc1UnormSrgb,
+    /// BC3 / DXT5, linear, 8 bpp (RGBA)
+    Bc3Unorm,
+    /// BC3 / DXT5, sRGB, 8 bpp
+    Bc3UnormSrgb,
+    /// BC4, linear, 4 bpp (R only — greyscale/AO/roughness)
+    Bc4Unorm,
+    /// BC5, linear, 8 bpp (RG — normal maps)
+    Bc5Unorm,
+    /// BC7, linear, 8 bpp (high-quality RGBA)
+    Bc7Unorm,
+    /// BC7, sRGB, 8 bpp
+    Bc7UnormSrgb,
+
+    // ── Uncompressed ───────────────────────────────────────────────────────
+    /// R8G8B8A8 Unorm (linear) — default
+    #[default]
+    Rgba8Unorm,
+    /// R8G8B8A8 sRGB
+    Rgba8UnormSrgb,
+    /// B8G8R8A8 Unorm (linear)
+    Bgra8Unorm,
+    /// B8G8R8A8 sRGB
+    Bgra8UnormSrgb,
+    /// R8 Unorm — single channel greyscale
+    R8Unorm,
+    /// R8G8 Unorm — two channel
+    R8G8Unorm,
+    /// R16G16B16A16 Float — half-precision HDR
+    Rgba16Float,
+    /// R32 Float — single channel 32-bit float
+    R32Float,
+}
+
+impl DdsSaveFormat {
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            DdsSaveFormat::Bc1Unorm => "BC1 (Linear, DXT1)",
+            DdsSaveFormat::Bc1UnormSrgb => "BC1 (sRGB, DX 10+)",
+            DdsSaveFormat::Bc3Unorm => "BC3 (Linear, DXT5)",
+            DdsSaveFormat::Bc3UnormSrgb => "BC3 (sRGB, DX 10+)",
+            DdsSaveFormat::Bc4Unorm => "BC4 (Linear, Unsigned)",
+            DdsSaveFormat::Bc5Unorm => "BC5 (Linear, Unsigned)",
+            DdsSaveFormat::Bc7Unorm => "BC7 (Linear, DX 11+)",
+            DdsSaveFormat::Bc7UnormSrgb => "BC7 (sRGB, DX 11+)",
+            DdsSaveFormat::Rgba8Unorm => "R8G8B8A8 (Linear, Unorm)",
+            DdsSaveFormat::Rgba8UnormSrgb => "R8G8B8A8 (sRGB)",
+            DdsSaveFormat::Bgra8Unorm => "B8G8R8A8 (Linear, Unorm)",
+            DdsSaveFormat::Bgra8UnormSrgb => "B8G8R8A8 (sRGB)",
+            DdsSaveFormat::R8Unorm => "R8 (Linear, Unsigned)",
+            DdsSaveFormat::R8G8Unorm => "R8G8 (Linear, Unsigned)",
+            DdsSaveFormat::Rgba16Float => "R16G16B16A16 (Float)",
+            DdsSaveFormat::R32Float => "R32 (Float)",
+        }
+    }
+
+    /// Whether this format requires BC compression via intel_tex_2.
+    pub fn is_bc_compressed(self) -> bool {
+        matches!(
+            self,
+            DdsSaveFormat::Bc1Unorm
+                | DdsSaveFormat::Bc1UnormSrgb
+                | DdsSaveFormat::Bc3Unorm
+                | DdsSaveFormat::Bc3UnormSrgb
+                | DdsSaveFormat::Bc4Unorm
+                | DdsSaveFormat::Bc5Unorm
+                | DdsSaveFormat::Bc7Unorm
+                | DdsSaveFormat::Bc7UnormSrgb
+        )
+    }
+
+    /// The source porter-texture ImageFormat to use when building the Image
+    /// before conversion (sRGB source for sRGB targets avoids gamma round-trips).
+    pub fn source_porter_format(self) -> porter_texture::ImageFormat {
+        if matches!(
+            self,
+            DdsSaveFormat::Rgba8UnormSrgb | DdsSaveFormat::Bgra8UnormSrgb
+        ) {
+            porter_texture::ImageFormat::R8G8B8A8UnormSrgb
+        } else {
+            porter_texture::ImageFormat::R8G8B8A8Unorm
+        }
+    }
+
+    /// The target porter-texture ImageFormat for uncompressed DDS saves.
+    /// Returns `None` for BC formats (handled separately via intel_tex_2).
+    pub fn uncompressed_porter_format(self) -> Option<porter_texture::ImageFormat> {
+        match self {
+            DdsSaveFormat::Rgba8Unorm => Some(porter_texture::ImageFormat::R8G8B8A8Unorm),
+            DdsSaveFormat::Rgba8UnormSrgb => Some(porter_texture::ImageFormat::R8G8B8A8UnormSrgb),
+            DdsSaveFormat::Bgra8Unorm => Some(porter_texture::ImageFormat::B8G8R8A8Unorm),
+            DdsSaveFormat::Bgra8UnormSrgb => Some(porter_texture::ImageFormat::B8G8R8A8UnormSrgb),
+            DdsSaveFormat::R8Unorm => Some(porter_texture::ImageFormat::R8Unorm),
+            DdsSaveFormat::R8G8Unorm => Some(porter_texture::ImageFormat::R8G8Unorm),
+            DdsSaveFormat::Rgba16Float => {
+                Some(porter_texture::ImageFormat::R16G16B16A16Float)
+            }
+            DdsSaveFormat::R32Float => Some(porter_texture::ImageFormat::R32Float),
+            _ => None, // BC formats
+        }
+    }
+
+    /// The porter-texture ImageFormat used as the frame format for BC saves.
+    /// Returns `None` for uncompressed formats.
+    pub fn bc_porter_format(self) -> Option<porter_texture::ImageFormat> {
+        match self {
+            DdsSaveFormat::Bc1Unorm => Some(porter_texture::ImageFormat::Bc1Unorm),
+            DdsSaveFormat::Bc1UnormSrgb => Some(porter_texture::ImageFormat::Bc1UnormSrgb),
+            DdsSaveFormat::Bc3Unorm => Some(porter_texture::ImageFormat::Bc3Unorm),
+            DdsSaveFormat::Bc3UnormSrgb => Some(porter_texture::ImageFormat::Bc3UnormSrgb),
+            DdsSaveFormat::Bc4Unorm => Some(porter_texture::ImageFormat::Bc4Unorm),
+            DdsSaveFormat::Bc5Unorm => Some(porter_texture::ImageFormat::Bc5Unorm),
+            DdsSaveFormat::Bc7Unorm => Some(porter_texture::ImageFormat::Bc7Unorm),
+            DdsSaveFormat::Bc7UnormSrgb => Some(porter_texture::ImageFormat::Bc7UnormSrgb),
+            _ => None,
+        }
+    }
+
+    pub const ALL: [DdsSaveFormat; 16] = [
+        // BC compressed
+        DdsSaveFormat::Bc1Unorm,
+        DdsSaveFormat::Bc1UnormSrgb,
+        DdsSaveFormat::Bc3Unorm,
+        DdsSaveFormat::Bc3UnormSrgb,
+        DdsSaveFormat::Bc4Unorm,
+        DdsSaveFormat::Bc5Unorm,
+        DdsSaveFormat::Bc7Unorm,
+        DdsSaveFormat::Bc7UnormSrgb,
+        // Uncompressed
+        DdsSaveFormat::Rgba8Unorm,
+        DdsSaveFormat::Rgba8UnormSrgb,
+        DdsSaveFormat::Bgra8Unorm,
+        DdsSaveFormat::Bgra8UnormSrgb,
+        DdsSaveFormat::R8Unorm,
+        DdsSaveFormat::R8G8Unorm,
+        DdsSaveFormat::Rgba16Float,
+        DdsSaveFormat::R32Float,
+    ];
+}
+
+impl std::fmt::Display for DdsSaveFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.display_name())
+    }
+}
+
 /// Main error type for texture converter operations
 #[derive(Debug, Clone)]
 #[allow(dead_code)]

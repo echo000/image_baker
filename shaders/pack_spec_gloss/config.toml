@@ -1,0 +1,21 @@
+[shader]
+name = "Pack Spec Gloss"
+description = "Combines Spec, and Gloss maps into a single packed texture."
+author = "echo000"
+version = "1.0.0"
+
+[[inputs]]
+suffix = "_s"
+description = "Specular map"
+required = true
+
+[[inputs]]
+suffix = "_g"
+description = "Gloss map"
+required = true
+
+[[outputs]]
+entry_point = "fs_spec"
+suffix = "_merged"
+description = "Combined Spec Gloss"
+format = "Rgba8Unorm"

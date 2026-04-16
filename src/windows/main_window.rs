@@ -49,11 +49,11 @@ impl MainWindow {
         // Load window icon
 
         let (id, task) = window::open(window::Settings {
-            size: Size::new(780.0, 720.0),
+            size: Size::new(960.0, 860.0),
             position: Position::Centered,
             min_size: Some(Size::new(780.0, 720.0)),
             visible: false,
-            resizable: false,
+            resizable: true,
             //icon,
             ..Default::default()
         });
@@ -139,7 +139,7 @@ impl MainWindow {
                     .width(Length::Fill)
                     .align_x(Alignment::End)
             ]
-            .padding([5, 20])
+            .padding([6, 16])
             .align_y(Alignment::Center)
         ]
         .align_x(Alignment::Center);
@@ -220,7 +220,6 @@ impl MainWindow {
         let result = if self.show_about {
             Task::none()
         } else {
-            // Texture converter accepts any image file
             self.texture_splitter.on_file_dropped(path)
         };
 

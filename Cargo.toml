@@ -43,6 +43,7 @@ pollster = "0.3"
 futures = "0.3"
 chrono = "0.4"
 futures-timer = "3.0.3"
+intel_tex_2 = "0.3"
 
 [build-dependencies]
 porter-build = { git = "https://github.com/echo000/porter-lib" }
