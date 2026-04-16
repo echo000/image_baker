@@ -8,7 +8,7 @@
 //! - Validate WGSL shader code syntax
 //! - Initialize GPU device for shader validation
 
-use crate::components::texture_converter::ShaderConfig;
+use crate::types::ShaderConfig;
 use std::path::{Path, PathBuf};
 
 /// Result type for shader operations

@@ -10,10 +10,10 @@
 //! work during UI rendering.
 
 use crate::components::droppable_image_slot::DroppableImageSlot;
-use crate::components::texture_converter::{ShaderConfig, ShaderParameter};
-use crate::porter_image::ImageBuffer;
 use crate::status::StatusMessage;
 use std::collections::HashMap;
+use texture_smith_core::ImageBuffer;
+use texture_smith_core::{ShaderConfig, ShaderParameter};
 
 /// State for the texture converter component with cached image handles
 ///

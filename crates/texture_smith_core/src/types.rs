@@ -1,35 +1,46 @@
-//! Type definitions and error types for the texture converter module
+//! Type definitions and error types for the texture processing core library.
+//!
+//! This module contains all shared types used across the crate, including:
+//! - Image format enumerations ([`ImageFormat`], [`DdsSaveFormat`])
+//! - Shader configuration types ([`ShaderConfig`], [`ShaderMetadata`], etc.)
+//! - Error types ([`ConverterError`], [`ShaderError`], [`GpuError`], [`FileError`])
+//! - Result type aliases
 
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-/// Result type for texture converter operations
-#[allow(dead_code)]
+// ─── Result Type Aliases ────────────────────────────────────────────────────
+
+/// Result type for texture converter operations.
 pub type ConverterResult<T> = Result<T, ConverterError>;
 
-/// Result type for shader operations
-#[allow(dead_code)]
+/// Result type for shader operations.
 pub type ShaderResult<T> = Result<T, ShaderError>;
 
-/// Result type for GPU operations
-#[allow(dead_code)]
+/// Result type for GPU operations.
 pub type GpuResult<T> = Result<T, GpuError>;
 
-/// Result type for file operations
-#[allow(dead_code)]
+/// Result type for file operations.
 pub type FileResult<T> = Result<T, FileError>;
 
-/// Supported output image formats (PorterLib supported formats only)
+// ─── Image Format Types ─────────────────────────────────────────────────────
+
+/// Supported output image formats (PorterLib supported formats only).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ImageFormat {
+    /// PNG format (lossless, widely supported).
     #[default]
     Png,
+    /// TGA format (Targa, common in game engines).
     Tga,
+    /// TIFF format (lossless, high quality).
     Tiff,
+    /// DDS format (DirectDraw Surface, GPU-native).
     Dds,
 }
 
 impl ImageFormat {
-    /// Get file extension for this format
+    /// Get file extension for this format.
     pub fn extension(&self) -> &'static str {
         match self {
             ImageFormat::Png => "png",
@@ -39,7 +50,7 @@ impl ImageFormat {
         }
     }
 
-    /// Get display name for this format
+    /// Get display name for this format.
     pub fn display_name(&self) -> &'static str {
         match self {
             ImageFormat::Png => "PNG",
@@ -49,7 +60,7 @@ impl ImageFormat {
         }
     }
 
-    /// Get all available formats
+    /// All available image formats.
     pub const ALL: [ImageFormat; 4] = [
         ImageFormat::Png,
         ImageFormat::Tga,
@@ -66,49 +77,50 @@ impl std::fmt::Display for ImageFormat {
 
 /// DDS pixel format sub-selection (shown when DDS is the export format).
 ///
-/// BC formats are encoded with intel_tex_2.
+/// BC formats are encoded with `intel_tex_2`.
 /// Uncompressed formats are converted via porter-texture's GPU converter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum DdsSaveFormat {
     // ── BC compressed ──────────────────────────────────────────────────────
-    /// BC1 / DXT1, linear, 4 bpp (RGB, 1-bit alpha)
+    /// BC1 / DXT1, linear, 4 bpp (RGB, 1-bit alpha).
     Bc1Unorm,
-    /// BC1 / DXT1, sRGB, 4 bpp
+    /// BC1 / DXT1, sRGB, 4 bpp.
     Bc1UnormSrgb,
-    /// BC3 / DXT5, linear, 8 bpp (RGBA)
+    /// BC3 / DXT5, linear, 8 bpp (RGBA).
     Bc3Unorm,
-    /// BC3 / DXT5, sRGB, 8 bpp
+    /// BC3 / DXT5, sRGB, 8 bpp.
     Bc3UnormSrgb,
-    /// BC4, linear, 4 bpp (R only — greyscale/AO/roughness)
+    /// BC4, linear, 4 bpp (R only — greyscale/AO/roughness).
     Bc4Unorm,
-    /// BC5, linear, 8 bpp (RG — normal maps)
+    /// BC5, linear, 8 bpp (RG — normal maps).
     Bc5Unorm,
-    /// BC7, linear, 8 bpp (high-quality RGBA)
+    /// BC7, linear, 8 bpp (high-quality RGBA).
     Bc7Unorm,
-    /// BC7, sRGB, 8 bpp
+    /// BC7, sRGB, 8 bpp.
     Bc7UnormSrgb,
 
     // ── Uncompressed ───────────────────────────────────────────────────────
-    /// R8G8B8A8 Unorm (linear) — default
+    /// R8G8B8A8 Unorm (linear) — default.
     #[default]
     Rgba8Unorm,
-    /// R8G8B8A8 sRGB
+    /// R8G8B8A8 sRGB.
     Rgba8UnormSrgb,
-    /// B8G8R8A8 Unorm (linear)
+    /// B8G8R8A8 Unorm (linear).
     Bgra8Unorm,
-    /// B8G8R8A8 sRGB
+    /// B8G8R8A8 sRGB.
     Bgra8UnormSrgb,
-    /// R8 Unorm — single channel greyscale
+    /// R8 Unorm — single channel greyscale.
     R8Unorm,
-    /// R8G8 Unorm — two channel
+    /// R8G8 Unorm — two channel.
     R8G8Unorm,
-    /// R16G16B16A16 Float — half-precision HDR
+    /// R16G16B16A16 Float — half-precision HDR.
     Rgba16Float,
-    /// R32 Float — single channel 32-bit float
+    /// R32 Float — single channel 32-bit float.
     R32Float,
 }
 
 impl DdsSaveFormat {
+    /// Human-readable display name for this DDS format.
     pub fn display_name(&self) -> &'static str {
         match self {
             DdsSaveFormat::Bc1Unorm => "BC1 (Linear, DXT1)",
@@ -130,7 +142,7 @@ impl DdsSaveFormat {
         }
     }
 
-    /// Whether this format requires BC compression via intel_tex_2.
+    /// Whether this format requires BC compression via `intel_tex_2`.
     pub fn is_bc_compressed(self) -> bool {
         matches!(
             self,
@@ -145,7 +157,7 @@ impl DdsSaveFormat {
         )
     }
 
-    /// The source porter-texture ImageFormat to use when building the Image
+    /// The source porter-texture `ImageFormat` to use when building the `Image`
     /// before conversion (sRGB source for sRGB targets avoids gamma round-trips).
     pub fn source_porter_format(self) -> porter_texture::ImageFormat {
         if matches!(
@@ -158,8 +170,9 @@ impl DdsSaveFormat {
         }
     }
 
-    /// The target porter-texture ImageFormat for uncompressed DDS saves.
-    /// Returns `None` for BC formats (handled separately via intel_tex_2).
+    /// The target porter-texture `ImageFormat` for uncompressed DDS saves.
+    ///
+    /// Returns `None` for BC formats (handled separately via `intel_tex_2`).
     pub fn uncompressed_porter_format(self) -> Option<porter_texture::ImageFormat> {
         match self {
             DdsSaveFormat::Rgba8Unorm => Some(porter_texture::ImageFormat::R8G8B8A8Unorm),
@@ -168,15 +181,14 @@ impl DdsSaveFormat {
             DdsSaveFormat::Bgra8UnormSrgb => Some(porter_texture::ImageFormat::B8G8R8A8UnormSrgb),
             DdsSaveFormat::R8Unorm => Some(porter_texture::ImageFormat::R8Unorm),
             DdsSaveFormat::R8G8Unorm => Some(porter_texture::ImageFormat::R8G8Unorm),
-            DdsSaveFormat::Rgba16Float => {
-                Some(porter_texture::ImageFormat::R16G16B16A16Float)
-            }
+            DdsSaveFormat::Rgba16Float => Some(porter_texture::ImageFormat::R16G16B16A16Float),
             DdsSaveFormat::R32Float => Some(porter_texture::ImageFormat::R32Float),
             _ => None, // BC formats
         }
     }
 
-    /// The porter-texture ImageFormat used as the frame format for BC saves.
+    /// The porter-texture `ImageFormat` used as the frame format for BC saves.
+    ///
     /// Returns `None` for uncompressed formats.
     pub fn bc_porter_format(self) -> Option<porter_texture::ImageFormat> {
         match self {
@@ -192,6 +204,7 @@ impl DdsSaveFormat {
         }
     }
 
+    /// All available DDS formats.
     pub const ALL: [DdsSaveFormat; 16] = [
         // BC compressed
         DdsSaveFormat::Bc1Unorm,
@@ -220,16 +233,130 @@ impl std::fmt::Display for DdsSaveFormat {
     }
 }
 
-/// Main error type for texture converter operations
+// ─── Shader Configuration Types ─────────────────────────────────────────────
+
+/// Top-level shader configuration loaded from a `config.toml` file.
+///
+/// Each shader directory contains a `shader.wgsl` and a `config.toml`.
+/// This struct represents the parsed configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShaderConfig {
+    /// Metadata about the shader (name, description, author, version).
+    pub shader: ShaderMetadata,
+    /// Input texture slots expected by the shader.
+    #[serde(default)]
+    pub inputs: Vec<InputConfig>,
+    /// Output render passes produced by the shader.
+    pub outputs: Vec<OutputConfig>,
+    /// User-adjustable parameters exposed by the shader.
+    #[serde(default)]
+    pub parameters: Vec<ShaderParameter>,
+    /// Path to the `shader.wgsl` file on disk (not serialized).
+    #[serde(skip)]
+    pub shader_path: PathBuf,
+}
+
+impl std::fmt::Display for ShaderConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.shader.name)
+    }
+}
+
+impl PartialEq for ShaderConfig {
+    fn eq(&self, other: &Self) -> bool {
+        self.shader.name == other.shader.name
+    }
+}
+
+impl Eq for ShaderConfig {}
+
+/// Metadata about a shader (the `[shader]` table in `config.toml`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShaderMetadata {
+    /// Human-readable shader name.
+    pub name: String,
+    /// Description of what the shader does.
+    pub description: String,
+    /// Author of the shader.
+    #[serde(default)]
+    pub author: String,
+    /// Version string for the shader.
+    #[serde(default)]
+    pub version: String,
+}
+
+/// Configuration for a single shader input texture slot.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InputConfig {
+    /// File suffix used to auto-match input images (e.g. `_diffuse`).
+    pub suffix: String,
+    /// Human-readable description of this input.
+    pub description: String,
+    /// Whether this input is required (`true`) or optional (`false`).
+    #[serde(default = "default_true")]
+    pub required: bool,
+}
+
+/// Configuration for a single shader output pass.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OutputConfig {
+    /// WGSL entry point function name for this output.
+    pub entry_point: String,
+    /// File suffix appended to the output filename (e.g. `_packed`).
+    pub suffix: String,
+    /// Human-readable description of this output.
+    pub description: String,
+    /// Texture format string (e.g. `"Rgba8Unorm"`).
+    #[serde(default = "default_format")]
+    pub format: String,
+}
+
+/// A user-adjustable shader parameter exposed as a uniform.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShaderParameter {
+    /// Parameter name (must match the WGSL uniform field name).
+    pub name: String,
+    /// Parameter type (e.g. `"float"`).
+    #[serde(rename = "type")]
+    pub param_type: String,
+    /// Default value for this parameter.
+    pub default: f32,
+    /// Minimum allowed value.
+    pub min: f32,
+    /// Maximum allowed value.
+    pub max: f32,
+    /// Human-readable description of this parameter.
+    pub description: String,
+}
+
+/// Default helper: returns `true` (used for `InputConfig::required`).
+fn default_true() -> bool {
+    true
+}
+
+/// Default helper: returns `"Rgba8Unorm"` (used for `OutputConfig::format`).
+fn default_format() -> String {
+    "Rgba8Unorm".to_string()
+}
+
+// ─── Error Types ────────────────────────────────────────────────────────────
+
+/// Main error type for texture converter operations.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub enum ConverterError {
+    /// A shader-related error occurred.
     Shader(ShaderError),
+    /// A GPU processing error occurred.
     Gpu(GpuError),
+    /// A file I/O error occurred.
     File(FileError),
+    /// An image processing error with a descriptive message.
     ImageProcessing(String),
+    /// No processed outputs are available to save.
     NoOutputsAvailable,
+    /// No shader has been selected.
     NoShaderSelected,
+    /// An invalid operation was attempted.
     InvalidOperation(String),
 }
 
@@ -267,17 +394,49 @@ impl From<FileError> for ConverterError {
     }
 }
 
-/// Shader-related errors
+/// Shader-related errors.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub enum ShaderError {
+    /// The shaders directory was not found.
     DirectoryNotFound,
+    /// No valid shaders were found in the directory.
     NoShadersFound,
-    LoadFailed { path: PathBuf, reason: String },
-    ParseFailed { path: PathBuf, reason: String },
-    ValidationFailed { shader_name: String, reason: String },
-    InvalidConfig { shader_name: String, reason: String },
-    CompilationFailed { shader_name: String, reason: String },
+    /// Failed to load a shader file from disk.
+    LoadFailed {
+        /// Path to the shader file.
+        path: PathBuf,
+        /// Reason for the failure.
+        reason: String,
+    },
+    /// Failed to parse a shader configuration file.
+    ParseFailed {
+        /// Path to the config file.
+        path: PathBuf,
+        /// Reason for the failure.
+        reason: String,
+    },
+    /// Shader validation failed.
+    ValidationFailed {
+        /// Name of the shader.
+        shader_name: String,
+        /// Reason for the failure.
+        reason: String,
+    },
+    /// Shader has an invalid configuration.
+    InvalidConfig {
+        /// Name of the shader.
+        shader_name: String,
+        /// Reason for the failure.
+        reason: String,
+    },
+    /// Shader WGSL compilation failed.
+    CompilationFailed {
+        /// Name of the shader.
+        shader_name: String,
+        /// Reason for the failure.
+        reason: String,
+    },
+    /// Failed to initialize the GPU for shader validation.
     GpuInitFailed(String),
 }
 
@@ -332,18 +491,48 @@ impl std::fmt::Display for ShaderError {
 
 impl std::error::Error for ShaderError {}
 
-/// GPU processing errors
+/// GPU processing errors.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub enum GpuError {
+    /// No images were provided for processing.
     NoImagesProvided,
-    ImageConversionFailed { reason: String },
-    BufferCreationFailed { reason: String },
-    TextureCreationFailed { reason: String },
-    PipelineCreationFailed { reason: String },
-    RenderFailed { reason: String },
-    BufferReadbackFailed { reason: String },
-    InvalidDimensions { width: u32, height: u32 },
+    /// Failed to convert an image to a GPU-compatible format.
+    ImageConversionFailed {
+        /// Reason for the failure.
+        reason: String,
+    },
+    /// Failed to create a GPU buffer.
+    BufferCreationFailed {
+        /// Reason for the failure.
+        reason: String,
+    },
+    /// Failed to create a GPU texture.
+    TextureCreationFailed {
+        /// Reason for the failure.
+        reason: String,
+    },
+    /// Failed to create a render pipeline.
+    PipelineCreationFailed {
+        /// Reason for the failure.
+        reason: String,
+    },
+    /// The GPU render pass failed.
+    RenderFailed {
+        /// Reason for the failure.
+        reason: String,
+    },
+    /// Failed to read data back from a GPU buffer.
+    BufferReadbackFailed {
+        /// Reason for the failure.
+        reason: String,
+    },
+    /// The provided image dimensions are invalid.
+    InvalidDimensions {
+        /// Image width.
+        width: u32,
+        /// Image height.
+        height: u32,
+    },
 }
 
 impl std::fmt::Display for GpuError {
@@ -375,15 +564,30 @@ impl std::fmt::Display for GpuError {
 
 impl std::error::Error for GpuError {}
 
-/// File operation errors
+/// File operation errors.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub enum FileError {
-    LoadFailed { path: PathBuf, reason: String },
-    SaveFailed { path: PathBuf, reason: String },
+    /// Failed to load a file from disk.
+    LoadFailed {
+        /// Path to the file.
+        path: PathBuf,
+        /// Reason for the failure.
+        reason: String,
+    },
+    /// Failed to save a file to disk.
+    SaveFailed {
+        /// Path to the file.
+        path: PathBuf,
+        /// Reason for the failure.
+        reason: String,
+    },
+    /// The save operation was cancelled by the user.
     SaveCancelled,
+    /// The file path is invalid.
     InvalidPath(PathBuf),
+    /// The file format is not supported.
     UnsupportedFormat(String),
+    /// Image buffer conversion failed.
     ConversionFailed(String),
 }
 

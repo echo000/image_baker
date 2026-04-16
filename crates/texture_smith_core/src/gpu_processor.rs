@@ -8,10 +8,13 @@
 //! - Handle multiple shader outputs
 //! - Read back processed results from GPU to CPU
 
-use crate::components::texture_converter::{FULLSCREEN_QUAD_VERTEX_SHADER, ShaderConfig};
 use crate::porter_image::{ImageBuffer, PorterImage};
+use crate::types::ShaderConfig;
 use std::collections::HashMap;
 use std::sync::Arc;
+
+/// Embedded fullscreen quad vertex shader used for all processing operations.
+const FULLSCREEN_QUAD_VERTEX_SHADER: &[u8] = include_bytes!("shaders/fullscreen_quad_vertex.wgsl");
 
 /// Result type for GPU operations
 pub type GpuResult<T> = Result<T, String>;
@@ -456,7 +459,7 @@ fn process_single_output(
     vertex_shader: &wgpu::ShaderModule,
     fragment_shader: &wgpu::ShaderModule,
     pipeline_layout: &wgpu::PipelineLayout,
-    output_config: &crate::components::texture_converter::OutputConfig,
+    output_config: &crate::types::OutputConfig,
     texture_size: wgpu::Extent3d,
     texture_bind_group: &wgpu::BindGroup,
     params_bind_group: Option<&wgpu::BindGroup>,

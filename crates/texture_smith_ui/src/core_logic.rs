@@ -1,4 +1,4 @@
-use crate::porter_image::{ImageBuffer, PorterImage};
+use texture_smith_core::{ImageBuffer, PorterImage};
 
 /// Convert a PorterImage to iced display handle
 pub fn image_to_handle(img: &mut PorterImage) -> iced::widget::image::Handle {

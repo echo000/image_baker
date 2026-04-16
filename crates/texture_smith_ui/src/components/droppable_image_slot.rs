@@ -1,4 +1,4 @@
-use crate::porter_image::PorterImage;
+use texture_smith_core::PorterImage;
 use std::path::PathBuf;
 use std::sync::Arc;
 

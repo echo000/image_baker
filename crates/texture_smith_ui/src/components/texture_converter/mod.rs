@@ -1,32 +1,28 @@
 //! Texture Converter Module
 //!
 //! A modular texture processing component that uses GPU shaders to transform images.
-//! Organized into focused submodules for maintainability:
-//! - `gpu_processor`: GPU shader execution and rendering
-//! - `shader_manager`: Shader loading and validation
+//! Core processing logic is provided by texture_smith_core.
 //! - `state`: Component state management with caching
-//! - `types`: Error types and type aliases
 
-mod gpu_processor;
-mod shader_manager;
 mod state;
-mod types;
 
-// Re-export public items
-pub use gpu_processor::process_images;
-pub use shader_manager::load_shaders;
+// Re-export state
 pub use state::TextureConverterState;
-pub use types::DdsSaveFormat;
-pub use types::ImageFormat;
 
-// Keep original types here for compatibility
+// Re-export from core for backward compat
+pub use texture_smith_core::{DdsSaveFormat, ImageFormat};
+
+// Import types from core crate
+use texture_smith_core::gpu_processor::process_images;
+use texture_smith_core::shader_manager::load_shaders;
+use texture_smith_core::{ImageBuffer, PorterImage, ShaderConfig};
+
+// Keep original UI imports
 use crate::components::droppable_image_slot::DroppableImageSlot;
 use crate::messages::Message;
-use crate::porter_image::{ImageBuffer, PorterImage};
 use crate::status::StatusMessage;
 use iced::widget::{button, column, container, pick_list, row, text};
 use iced::{Element, Length, Task};
-use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -37,11 +33,6 @@ const PARAMETER_DEBOUNCE_MS: u64 = 150;
 /// Maximum image dimension supported
 #[allow(dead_code)]
 const MAX_IMAGE_DIMENSION: u32 = 8192;
-
-
-// Shared vertex shader for all texture processing operations
-pub const FULLSCREEN_QUAD_VERTEX_SHADER: &[u8] =
-    include_bytes!("../../shaders/fullscreen_quad_vertex.wgsl");
 
 /// Texture converter component
 pub struct TextureSplitter {
@@ -70,78 +61,6 @@ pub enum TextureSplitterMessage {
     PreviousOutput,
     ReloadShaders,
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ShaderConfig {
-    pub shader: ShaderMetadata,
-    #[serde(default)]
-    pub inputs: Vec<InputConfig>,
-    pub outputs: Vec<OutputConfig>,
-    #[serde(default)]
-    pub parameters: Vec<ShaderParameter>,
-    #[serde(skip)]
-    pub shader_path: PathBuf,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ShaderMetadata {
-    pub name: String,
-    pub description: String,
-    #[serde(default)]
-    pub author: String,
-    #[serde(default)]
-    pub version: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InputConfig {
-    pub suffix: String,
-    pub description: String,
-    #[serde(default = "default_true")]
-    pub required: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OutputConfig {
-    pub entry_point: String,
-    pub suffix: String,
-    pub description: String,
-    #[serde(default = "default_format")]
-    pub format: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ShaderParameter {
-    pub name: String,
-    #[serde(rename = "type")]
-    pub param_type: String,
-    pub default: f32,
-    pub min: f32,
-    pub max: f32,
-    pub description: String,
-}
-
-fn default_true() -> bool {
-    true
-}
-
-fn default_format() -> String {
-    "Rgba8Unorm".to_string()
-}
-
-impl std::fmt::Display for ShaderConfig {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.shader.name)
-    }
-}
-
-impl PartialEq for ShaderConfig {
-    fn eq(&self, other: &Self) -> bool {
-        self.shader.name == other.shader.name
-    }
-}
-
-impl Eq for ShaderConfig {}
 
 impl TextureSplitter {
     /// Creates a new texture splitter component
@@ -343,7 +262,7 @@ impl TextureSplitter {
             .style(crate::widget_helpers::dark_style);
 
             if self.state.outputs.len() > 1 {
-                let prev_button = button("‹")
+                let prev_button = button("\u{2039}")
                     .on_press_maybe(if self.state.current_output_index > 0 {
                         Some(TextureSplitterMessage::PreviousOutput)
                     } else {
@@ -352,7 +271,7 @@ impl TextureSplitter {
                     .padding([4, 10])
                     .style(crate::widget_helpers::primary_button_style);
 
-                let next_button = button("›")
+                let next_button = button("\u{203a}")
                     .on_press_maybe(
                         if self.state.current_output_index < self.state.outputs.len() - 1 {
                             Some(TextureSplitterMessage::NextOutput)
@@ -441,14 +360,14 @@ impl TextureSplitter {
 
         controls.push(
             column![
-                text("Output Format")
-                    .size(12)
-                    .style(|theme: &iced::Theme| iced::widget::text::Style {
+                text("Output Format").size(12).style(|theme: &iced::Theme| {
+                    iced::widget::text::Style {
                         color: Some(iced::Color {
                             a: 0.6,
                             ..theme.extended_palette().background.base.text
                         }),
-                    }),
+                    }
+                }),
                 format_selector,
             ]
             .spacing(4)
@@ -711,7 +630,6 @@ impl TextureSplitter {
                 }
             }
 
-
             // Get parameters
             let shader_name = shader.shader.name.clone();
             let param_values = self
@@ -777,130 +695,16 @@ impl TextureSplitter {
 
             let format = self.selected_format;
             let dds_format = self.selected_dds_format;
+            let folder_path_clone = folder_path.clone();
 
             Task::perform(
                 async move {
-                    let mut saved_paths = Vec::new();
-
-                    for (buffer, description) in outputs {
-                        let filename = format!(
-                            "{}.{}",
-                            description
-                                .to_lowercase()
-                                .replace(" ", "_")
-                                .replace("/", "_")
-                                .replace("\\", "_"),
-                            format.extension()
-                        );
-
-                        let file_path = folder_path.join(&filename);
-
-                        std::fs::create_dir_all(file_path.parent().unwrap_or(&file_path))
-                            .map_err(|e| format!("Failed to create directory: {e}"))?;
-
-                        if format == ImageFormat::Dds && dds_format.is_bc_compressed() {
-                            // ── BC compression via intel_tex_2 ──────────────
-                            let (width, height) = buffer.dimensions();
-                            let rgba_data = buffer.into_raw();
-
-                            let surface = intel_tex_2::RgbaSurface {
-                                width,
-                                height,
-                                stride: width * 4,
-                                data: &rgba_data,
-                            };
-
-                            let compressed = match dds_format {
-                                DdsSaveFormat::Bc1Unorm | DdsSaveFormat::Bc1UnormSrgb => {
-                                    intel_tex_2::bc1::compress_blocks(&surface)
-                                }
-                                DdsSaveFormat::Bc3Unorm | DdsSaveFormat::Bc3UnormSrgb => {
-                                    intel_tex_2::bc3::compress_blocks(&surface)
-                                }
-                                DdsSaveFormat::Bc4Unorm => {
-                                    intel_tex_2::bc4::compress_blocks(&surface)
-                                }
-                                DdsSaveFormat::Bc5Unorm => {
-                                    intel_tex_2::bc5::compress_blocks(&surface)
-                                }
-                                DdsSaveFormat::Bc7Unorm | DdsSaveFormat::Bc7UnormSrgb => {
-                                    let settings =
-                                        intel_tex_2::bc7::alpha_ultra_fast_settings();
-                                    intel_tex_2::bc7::compress_blocks(&settings, &surface)
-                                }
-                                _ => unreachable!(),
-                            };
-
-                            let porter_fmt = dds_format.bc_porter_format().unwrap();
-
-                            let mut img =
-                                porter_texture::Image::new(width, height, porter_fmt)
-                                    .map_err(|e| format!("Failed to create image: {e:?}"))?;
-
-                            let frame = img.create_frame().map_err(|e| {
-                                format!("Failed to create frame: {e:?}")
-                            })?;
-
-                            frame.buffer_mut().copy_from_slice(&compressed);
-
-                            img.save(&file_path, porter_texture::ImageFileType::Dds)
-                                .map_err(|e| format!("Failed to save {filename}: {e:?}"))?;
-
-                            saved_paths.push(file_path);
-                        } else if format == ImageFormat::Dds {
-                            // ── Uncompressed DDS via porter-texture ─────────
-                            let (width, height) = buffer.dimensions();
-                            let rgba_data = buffer.into_raw();
-
-                            let source_fmt = dds_format.source_porter_format();
-                            let target_fmt =
-                                dds_format.uncompressed_porter_format().unwrap();
-
-                            let mut img =
-                                porter_texture::Image::new(width, height, source_fmt)
-                                    .map_err(|e| format!("Failed to create image: {e:?}"))?;
-
-                            let frame = img.create_frame().map_err(|e| {
-                                format!("Failed to create frame: {e:?}")
-                            })?;
-
-                            frame.buffer_mut().copy_from_slice(&rgba_data);
-
-                            if target_fmt != source_fmt {
-                                img.convert(
-                                    target_fmt,
-                                    porter_texture::ImageConvertOptions::None,
-                                )
-                                .map_err(|e| {
-                                    format!("Failed to convert to {target_fmt:?}: {e:?}")
-                                })?;
-                            }
-
-                            img.save(&file_path, porter_texture::ImageFileType::Dds)
-                                .map_err(|e| format!("Failed to save {filename}: {e:?}"))?;
-
-                            saved_paths.push(file_path);
-                        } else {
-                            // ── PNG / TGA / TIFF — existing path ────────────
-                            match buffer.into_porter_image() {
-                                Ok(mut img) => match img.save(&file_path) {
-                                    Ok(_) => {
-                                        saved_paths.push(file_path);
-                                    }
-                                    Err(e) => {
-                                        return Err(format!("Failed to save {filename}: {e}"));
-                                    }
-                                },
-                                Err(e) => {
-                                    return Err(format!(
-                                        "Failed to convert buffer for {filename}: {e}"
-                                    ));
-                                }
-                            }
-                        }
-                    }
-
-                    Ok(saved_paths)
+                    texture_smith_core::save::save_outputs(
+                        &outputs,
+                        &folder_path_clone,
+                        format,
+                        dds_format,
+                    )
                 },
                 |result| {
                     Message::Main(crate::windows::MainMessage::TextureSplitter(
@@ -969,16 +773,14 @@ impl TextureSplitter {
             .style(dark_style)
             .into()
         } else {
-            container(
-                text("·")
-                    .size(20)
-                    .style(|theme: &iced::Theme| iced::widget::text::Style {
-                        color: Some(iced::Color {
-                            a: 0.2,
-                            ..theme.extended_palette().background.base.text
-                        }),
+            container(text("\u{00b7}").size(20).style(|theme: &iced::Theme| {
+                iced::widget::text::Style {
+                    color: Some(iced::Color {
+                        a: 0.2,
+                        ..theme.extended_palette().background.base.text
                     }),
-            )
+                }
+            }))
             .width(THUMB)
             .height(THUMB)
             .style(drop_zone_style)

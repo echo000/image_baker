@@ -11,7 +11,6 @@ mod executor;
 mod logger;
 mod messages;
 mod panic_hook;
-mod porter_image;
 mod settings;
 mod status;
 mod system;
