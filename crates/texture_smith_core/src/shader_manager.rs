@@ -24,23 +24,23 @@ pub type ShaderResult<T> = Result<T, String>;
 /// - `Ok((Vec<ShaderConfig>, usize))` - Loaded shaders and failed count
 /// - `Err(String)` - Error message if shader directory not found or GPU init fails
 pub async fn load_shaders() -> ShaderResult<(Vec<ShaderConfig>, usize)> {
+    let shaders_dir = find_shaders_directory()?;
+    load_shaders_from_dir(&shaders_dir).await
+}
+
+/// Load shaders from an explicit directory path.
+pub async fn load_shaders_from_dir(shaders_dir: &Path) -> ShaderResult<(Vec<ShaderConfig>, usize)> {
     tracing::info!("Starting shader loading process...");
 
-    // Initialize wgpu for shader validation
     let (device, _queue) = initialize_gpu_device().await?;
-
-    // Find the shaders directory
-    let shaders_dir = find_shaders_directory()?;
     tracing::info!("Loading shaders from: {}", shaders_dir.display());
 
-    // Discover all shader files
-    let shader_files = discover_shader_files(&shaders_dir)?;
+    let shader_files = discover_shader_files(shaders_dir)?;
 
     if shader_files.is_empty() {
         return Ok((Vec::new(), 0));
     }
 
-    // Load and validate each shader
     let mut loaded_shaders = Vec::new();
     let mut failed_count = 0;
 

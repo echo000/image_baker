@@ -15,13 +15,14 @@ pub use texture_smith_core::{DdsSaveFormat, ImageFormat};
 // Import types from core crate
 use texture_smith_core::gpu_processor::process_images;
 use texture_smith_core::shader_manager::load_shaders;
+use texture_smith_core::types::ParameterControl;
 use texture_smith_core::{ImageBuffer, PorterImage, ShaderConfig};
 
 // Keep original UI imports
 use crate::components::droppable_image_slot::DroppableImageSlot;
 use crate::messages::Message;
 use crate::status::StatusMessage;
-use iced::widget::{button, column, container, pick_list, row, text};
+use iced::widget::{button, column, container, pick_list, row, text, text_input};
 use iced::{Element, Length, Task};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -46,9 +47,10 @@ pub struct TextureSplitter {
 pub enum TextureSplitterMessage {
     ShaderSelected(String),
     ShadersLoaded(Result<(Vec<ShaderConfig>, usize), String>),
-    ParameterChanged(String, f32),  // (parameter_name, value)
-    DebouncedParameterProcess(u64), // Process parameters after debounce (generation)
-    BrowseInput(usize),             // Browse for input slot at index
+    ParameterChanged(String, f32),        // (parameter_name, value)
+    ParameterTextChanged(String, String), // (parameter_name, editable value)
+    DebouncedParameterProcess(u64),       // Process parameters after debounce (generation)
+    BrowseInput(usize),                   // Browse for input slot at index
     InputFileSelected(usize, Option<PathBuf>), // Input slot index, path
     InputImageLoaded(usize, Result<PorterImage, String>, Option<PathBuf>), // Input slot index, image, source path
     MergeCompleted(Result<Vec<(ImageBuffer, String)>, String>, u64), // Result (outputs with descriptions), generation
@@ -63,6 +65,25 @@ pub enum TextureSplitterMessage {
 }
 
 impl TextureSplitter {
+    /// Debounce shader processing after a valid parameter change.
+    fn schedule_parameter_processing(&mut self) -> Task<Message> {
+        self.state.parameter_debounce_generation += 1;
+        let generation = self.state.parameter_debounce_generation;
+
+        Task::perform(
+            async move {
+                futures_timer::Delay::new(std::time::Duration::from_millis(PARAMETER_DEBOUNCE_MS))
+                    .await;
+                generation
+            },
+            |debounce_gen| {
+                Message::Main(crate::windows::MainMessage::TextureSplitter(
+                    TextureSplitterMessage::DebouncedParameterProcess(debounce_gen),
+                ))
+            },
+        )
+    }
+
     /// Creates a new texture splitter component
     pub fn new() -> Self {
         Self {
@@ -91,26 +112,46 @@ impl TextureSplitter {
                     if let Some(param_map) = self.state.parameter_values.get_mut(shader_name) {
                         param_map.insert(param_name, value);
                     }
-                    // Increment debounce generation and schedule delayed processing
-                    self.state.parameter_debounce_generation += 1;
-                    let generation = self.state.parameter_debounce_generation;
-
-                    // Wait before processing (debounce)
-                    return Task::perform(
-                        async move {
-                            futures_timer::Delay::new(std::time::Duration::from_millis(
-                                PARAMETER_DEBOUNCE_MS,
-                            ))
-                            .await;
-                            generation
-                        },
-                        |debounce_gen| {
-                            Message::Main(crate::windows::MainMessage::TextureSplitter(
-                                TextureSplitterMessage::DebouncedParameterProcess(debounce_gen),
-                            ))
-                        },
-                    );
+                    return self.schedule_parameter_processing();
                 }
+                Task::none()
+            }
+            TextureSplitterMessage::ParameterTextChanged(param_name, text_value) => {
+                let Some(shader_name) = self.state.selected_shader.clone() else {
+                    return Task::none();
+                };
+
+                self.state
+                    .parameter_text_values
+                    .entry(shader_name.clone())
+                    .or_default()
+                    .insert(param_name.clone(), text_value.clone());
+
+                let parsed_value = text_value.parse::<f32>().ok().filter(|value| {
+                    value.is_finite()
+                        && self
+                            .state
+                            .get_selected_shader()
+                            .and_then(|shader| {
+                                shader
+                                    .parameters
+                                    .into_iter()
+                                    .find(|parameter| parameter.name == param_name)
+                            })
+                            .is_some_and(|parameter| {
+                                *value >= parameter.min && *value <= parameter.max
+                            })
+                });
+
+                if let Some(value) = parsed_value {
+                    self.state
+                        .parameter_values
+                        .entry(shader_name)
+                        .or_default()
+                        .insert(param_name, value);
+                    return self.schedule_parameter_processing();
+                }
+
                 Task::none()
             }
             TextureSplitterMessage::DebouncedParameterProcess(generation) => {
@@ -323,7 +364,7 @@ impl TextureSplitter {
             create_output_preview(&None, "Output will appear here")
         };
 
-        // ── Parameter sliders ─────────────────────────────────────────────────
+        // ── Shader parameters ─────────────────────────────────────────────────
         let mut controls = Vec::new();
         if let Some(shader) = self.state.get_selected_shader() {
             let shader_name = shader.shader.name.clone();
@@ -336,14 +377,41 @@ impl TextureSplitter {
                     .unwrap_or(param.default);
 
                 let param_name = param.name.clone();
-                controls.push(create_slider_control(
-                    param.description.clone(),
-                    current_value as f64,
-                    param.min as f64..=param.max as f64,
-                    move |val| {
-                        TextureSplitterMessage::ParameterChanged(param_name.clone(), val as f32)
-                    },
-                ));
+                if param.control == ParameterControl::Text {
+                    let current_text = self
+                        .state
+                        .parameter_text_values
+                        .get(&shader_name)
+                        .and_then(|values| values.get(&param.name))
+                        .map(String::as_str)
+                        .unwrap_or("");
+
+                    controls.push(
+                        column![
+                            text(param.description.clone()).size(12),
+                            text_input("Value", current_text)
+                                .on_input(move |value| {
+                                    TextureSplitterMessage::ParameterTextChanged(
+                                        param_name.clone(),
+                                        value,
+                                    )
+                                })
+                                .padding([6, 8])
+                                .width(Length::Fill),
+                        ]
+                        .spacing(4)
+                        .into(),
+                    );
+                } else {
+                    controls.push(create_slider_control(
+                        param.description.clone(),
+                        current_value as f64,
+                        param.min as f64..=param.max as f64,
+                        move |val| {
+                            TextureSplitterMessage::ParameterChanged(param_name.clone(), val as f32)
+                        },
+                    ));
+                }
             }
         }
 

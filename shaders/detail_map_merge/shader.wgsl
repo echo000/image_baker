@@ -20,6 +20,8 @@ var detail_sampler: sampler;
 // Parameters uniform buffer (group 1)
 struct Parameters {
     detail_intensity: f32,
+    detail_tiling_x: f32,
+    detail_tiling_y: f32,
 }
 
 @group(1) @binding(0)
@@ -30,8 +32,9 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     // Sample base colour texture
     let base = textureSample(base_texture, base_sampler, input.tex_coords);
 
-    // Sample detail texture
-    let detail = textureSample(detail_texture, detail_sampler, input.tex_coords);
+    // Tile and sample the detail texture. Its sampler uses repeat addressing.
+    let detail_uv = input.tex_coords * vec2<f32>(params.detail_tiling_x, params.detail_tiling_y);
+    let detail = textureSample(detail_texture, detail_sampler, detail_uv);
 
     // Get the mask value from the base alpha channel
     let mask_value = base.a;

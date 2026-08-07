@@ -295,6 +295,22 @@ pub struct InputConfig {
     /// Whether this input is required (`true`) or optional (`false`).
     #[serde(default = "default_true")]
     pub required: bool,
+    /// How texture coordinates outside the 0..1 range are addressed.
+    #[serde(default)]
+    pub address_mode: TextureAddressMode,
+}
+
+/// Addressing mode used by an input texture sampler.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TextureAddressMode {
+    /// Clamp texture coordinates to the nearest edge pixel.
+    #[default]
+    ClampToEdge,
+    /// Repeat the texture for each integer texture-coordinate interval.
+    Repeat,
+    /// Repeat the texture, mirroring every other interval.
+    MirrorRepeat,
 }
 
 /// Configuration for a single shader output pass.
@@ -319,6 +335,9 @@ pub struct ShaderParameter {
     /// Parameter type (e.g. `"float"`).
     #[serde(rename = "type")]
     pub param_type: String,
+    /// UI control used to edit this parameter.
+    #[serde(default)]
+    pub control: ParameterControl,
     /// Default value for this parameter.
     pub default: f32,
     /// Minimum allowed value.
@@ -327,6 +346,17 @@ pub struct ShaderParameter {
     pub max: f32,
     /// Human-readable description of this parameter.
     pub description: String,
+}
+
+/// UI control used to edit a shader parameter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ParameterControl {
+    /// Edit the value with a bounded slider.
+    #[default]
+    Slider,
+    /// Edit the numeric value as text.
+    Text,
 }
 
 /// Default helper: returns `true` (used for `InputConfig::required`).

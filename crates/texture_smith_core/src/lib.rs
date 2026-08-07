@@ -13,6 +13,8 @@
 //! - [`shader_manager`] — Shader discovery, loading, and validation
 //! - [`save`] — Image saving in various formats (PNG, TGA, TIFF, DDS)
 
+#[cfg(feature = "library")]
+pub mod ffi;
 pub mod gpu_processor;
 pub mod porter_image;
 pub mod save;

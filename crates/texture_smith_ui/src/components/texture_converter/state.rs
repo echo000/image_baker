@@ -13,6 +13,7 @@ use crate::components::droppable_image_slot::DroppableImageSlot;
 use crate::status::StatusMessage;
 use std::collections::HashMap;
 use texture_smith_core::ImageBuffer;
+use texture_smith_core::types::ParameterControl;
 use texture_smith_core::{ShaderConfig, ShaderParameter};
 
 /// State for the texture converter component with cached image handles
@@ -32,6 +33,9 @@ pub struct TextureConverterState {
 
     // Store parameter values: shader_name -> (parameter_name -> value)
     pub parameter_values: HashMap<String, HashMap<String, f32>>,
+
+    // Preserve editable text for parameters rendered as numeric text inputs.
+    pub parameter_text_values: HashMap<String, HashMap<String, String>>,
 
     // Input slots for all shaders
     pub input_slots: Vec<DroppableImageSlot>,
@@ -64,6 +68,7 @@ impl TextureConverterState {
             selected_shader: None,
             shaders_loading: false,
             parameter_values: HashMap::new(),
+            parameter_text_values: HashMap::new(),
             input_slots: Vec::new(),
             input_slot_handles: Vec::new(),
             input_slot_generations: Vec::new(),
@@ -137,7 +142,15 @@ impl TextureConverterState {
             .or_default();
 
         for param in parameters {
-            param_map.entry(param.name.clone()).or_insert(param.default);
+            let value = *param_map.entry(param.name.clone()).or_insert(param.default);
+
+            if param.control == ParameterControl::Text {
+                self.parameter_text_values
+                    .entry(shader_name.to_string())
+                    .or_default()
+                    .entry(param.name.clone())
+                    .or_insert_with(|| value.to_string());
+            }
         }
     }
 

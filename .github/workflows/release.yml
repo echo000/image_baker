@@ -80,9 +80,10 @@ jobs:
         shell: bash
         run: |
           mkdir -p release_package
-          cp target/${{ matrix.target }}/release/image_baker.exe release_package/ImageBaker.exe
+          cp target/${{ matrix.target }}/release/texture_smith.exe release_package/TextureSmith.exe
+          cp -r shaders release_package/shaders
           cd release_package
-          7z a ../ImageBaker-windows-x64.zip ImageBaker.exe
+          7z a ../ImageBaker-windows-x64.zip ImageBaker.exe shaders
           cd ..
           echo "ASSET=ImageBaker-windows-x64.zip" >> $GITHUB_ENV
 
@@ -91,10 +92,11 @@ jobs:
         shell: bash
         run: |
           mkdir -p release_package
-          cp target/${{ matrix.target }}/release/image_baker release_package/ImageBaker
+          cp target/${{ matrix.target }}/release/texture_smith release_package/TextureSmith
           chmod +x release_package/ImageBaker
+          cp -r shaders release_package/shaders
           cd release_package
-          zip ../ImageBaker-macos-x64.zip ImageBaker
+          zip -r ../ImageBaker-macos-x64.zip ImageBaker shaders
           cd ..
           echo "ASSET=ImageBaker-macos-x64.zip" >> $GITHUB_ENV
 
@@ -103,10 +105,11 @@ jobs:
         shell: bash
         run: |
           mkdir -p release_package
-          cp target/${{ matrix.target }}/release/image_baker release_package/ImageBaker
+          cp target/${{ matrix.target }}/release/texture_smith release_package/TextureSmith
           chmod +x release_package/ImageBaker
+          cp -r shaders release_package/shaders
           cd release_package
-          zip ../ImageBaker-linux-x64.zip ImageBaker
+          zip -r ../ImageBaker-linux-x64.zip ImageBaker shaders
           cd ..
           echo "ASSET=ImageBaker-linux-x64.zip" >> $GITHUB_ENV
 

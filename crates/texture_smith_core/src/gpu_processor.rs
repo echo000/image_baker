@@ -9,7 +9,7 @@
 //! - Read back processed results from GPU to CPU
 
 use crate::porter_image::{ImageBuffer, PorterImage};
-use crate::types::ShaderConfig;
+use crate::types::{ShaderConfig, TextureAddressMode};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -150,7 +150,7 @@ fn create_input_textures(
     let mut input_samplers = Vec::new();
 
     // Create textures for all defined inputs (including placeholders for optional ones)
-    for (idx, _input_config) in shader_config.inputs.iter().enumerate() {
+    for (idx, input_config) in shader_config.inputs.iter().enumerate() {
         let texture = if idx < images.len() {
             create_image_texture(device, queue, &images[idx], idx)?
         } else {
@@ -158,7 +158,7 @@ fn create_input_textures(
         };
 
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let sampler = create_sampler(device, idx);
+        let sampler = create_sampler(device, idx, input_config.address_mode);
 
         input_textures.push(texture);
         input_views.push(view);
@@ -256,13 +256,23 @@ fn create_placeholder_texture(
 
 /// Create a sampler for texture filtering
 ///
-/// Configures linear filtering and clamp-to-edge addressing.
-fn create_sampler(device: &wgpu::Device, idx: usize) -> wgpu::Sampler {
+/// Configures linear filtering and the input's requested addressing mode.
+fn create_sampler(
+    device: &wgpu::Device,
+    idx: usize,
+    address_mode: TextureAddressMode,
+) -> wgpu::Sampler {
+    let address_mode = match address_mode {
+        TextureAddressMode::ClampToEdge => wgpu::AddressMode::ClampToEdge,
+        TextureAddressMode::Repeat => wgpu::AddressMode::Repeat,
+        TextureAddressMode::MirrorRepeat => wgpu::AddressMode::MirrorRepeat,
+    };
+
     device.create_sampler(&wgpu::SamplerDescriptor {
         label: Some(&format!("Sampler {idx}")),
-        address_mode_u: wgpu::AddressMode::ClampToEdge,
-        address_mode_v: wgpu::AddressMode::ClampToEdge,
-        address_mode_w: wgpu::AddressMode::ClampToEdge,
+        address_mode_u: address_mode,
+        address_mode_v: address_mode,
+        address_mode_w: address_mode,
         mag_filter: wgpu::FilterMode::Linear,
         min_filter: wgpu::FilterMode::Linear,
         mipmap_filter: wgpu::FilterMode::Nearest,

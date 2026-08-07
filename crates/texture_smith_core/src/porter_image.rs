@@ -220,6 +220,25 @@ impl PorterImage {
         self.inner
     }
 
+    /// Load an image from raw file bytes, detecting the format from the extension.
+    pub fn from_bytes(bytes: &[u8], extension: &str) -> Result<Self, String> {
+        use std::io::Cursor;
+
+        let file_type = match extension.to_lowercase().as_str() {
+            "png" => ImageFileType::Png,
+            "tga" => ImageFileType::Tga,
+            "tif" | "tiff" => ImageFileType::Tiff,
+            "dds" => ImageFileType::Dds,
+            _ => return Err(format!("Unsupported extension: {extension}")),
+        };
+
+        let mut cursor = Cursor::new(bytes);
+        let inner = Image::load_from(&mut cursor, file_type)
+            .map_err(|e| format!("Failed to load image from bytes: {e:?}"))?;
+
+        Ok(Self { inner })
+    }
+
     /// Create from an existing porter_texture::Image
     pub fn from_inner(inner: Image) -> Self {
         Self { inner }

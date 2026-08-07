@@ -11,6 +11,10 @@ categories = ["graphics", "multimedia::images"]
 
 [lib]
 name = "texture_smith_core"
+crate-type = ["rlib", "cdylib"]
+
+[features]
+library = []
 
 [dependencies]
 porter-gpu = { git = "https://github.com/dtzxporter/porter-lib" }
